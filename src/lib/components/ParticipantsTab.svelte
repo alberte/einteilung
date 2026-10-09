@@ -1,0 +1,257 @@
+<script lang="ts">
+  import { app } from "../state.svelte";
+  import ImportDialog from "./ImportDialog.svelte";
+  import { validateProject } from "../validation";
+  import type { ImportSummary } from "../io/applyImport";
+
+  let showImport = $state(false);
+  let newPersonName = $state("");
+  let search = $state("");
+  let expandedId = $state<string | null>(null);
+  let lastSummary = $state<ImportSummary | null>(null);
+
+  const validation = $derived(validateProject(app.project));
+
+  const filteredPersons = $derived(
+    app.project.persons.filter((p) => p.name.toLowerCase().includes(search.trim().toLowerCase())),
+  );
+
+  function addPerson() {
+    const person = app.addPerson(newPersonName);
+    newPersonName = "";
+    if (person) expandedId = person.id;
+  }
+
+  function removePersonConfirm(id: string, name: string) {
+    if (confirm(`Teilnehmer „${name}“ (inkl. Wünsche) löschen?`)) {
+      app.removePerson(id);
+      if (expandedId === id) expandedId = null;
+    }
+  }
+
+  function workshopName(id: string): string {
+    return app.project.workshops.find((w) => w.id === id)?.name ?? "?";
+  }
+
+  function slotName(workshopId: string): string {
+    const w = app.project.workshops.find((ws) => ws.id === workshopId);
+    return w ? (app.project.slots.find((s) => s.id === w.slotId)?.name ?? "?") : "?";
+  }
+
+  /** Workshops, die für eine zusätzliche Wunschauswahl noch verfügbar sind. */
+  function availableWorkshops(personId: string, currentWorkshopId: string) {
+    const used = new Set(
+      app
+        .wishesOf(personId)
+        .map((w) => w.workshopId)
+        .filter((id) => id !== currentWorkshopId),
+    );
+    return app.project.workshops.filter((w) => !used.has(w.id));
+  }
+</script>
+
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <button
+    class="btn btn-primary"
+    onclick={() => {
+      lastSummary = null;
+      showImport = true;
+    }}
+  >
+    <i class="bi bi-file-import me-1"></i>CSV / XLSX importieren
+  </button>
+  <form
+    class="d-flex gap-2"
+    onsubmit={(e) => {
+      e.preventDefault();
+      addPerson();
+    }}
+  >
+    <input
+      class="form-control"
+      placeholder="Teilnehmer von Hand hinzufügen"
+      bind:value={newPersonName}
+      aria-label="Neuer Teilnehmer"
+    />
+    <button
+      class="btn btn-outline-primary text-nowrap"
+      type="submit"
+      disabled={!newPersonName.trim()}
+      title="Teilnehmer hinzufügen"
+      aria-label="Teilnehmer hinzufügen"
+    >
+      <i class="bi bi-person-plus"></i>
+    </button>
+  </form>
+  <input
+    class="form-control ms-auto"
+    style="max-width: 16rem;"
+    placeholder="Suchen …"
+    bind:value={search}
+    aria-label="Teilnehmer suchen"
+  />
+</div>
+
+{#if lastSummary}
+  <div
+    class="alert {lastSummary.unmatchedWorkshops.length
+      ? 'alert-warning'
+      : 'alert-success'} alert-dismissible"
+  >
+    <div>
+      Import: <strong>{lastSummary.personsAdded}</strong> Teilnehmer,
+      <strong>{lastSummary.wishesAdded}</strong> Wünsche
+      {lastSummary.skippedRows ? `, ${lastSummary.skippedRows} Zeilen ohne Namen übersprungen` : ""}
+      ({lastSummary.mode === "replace" ? "ersetzt" : "angehängt"}).
+    </div>
+    {#if lastSummary.unmatchedWorkshops.length}
+      <div>
+        Unbekannte Workshop-Namen (verworfen):
+        <strong>{lastSummary.unmatchedWorkshops.join(", ")}</strong>
+      </div>
+    {/if}
+    <button
+      type="button"
+      class="btn-close"
+      aria-label="Schließen"
+      onclick={() => (lastSummary = null)}
+    ></button>
+  </div>
+{/if}
+
+{#if validation.warnings.length}
+  <div class="alert alert-warning py-2 small">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    {#each validation.warnings as w, i (i)}
+      <div>{w}</div>
+    {/each}
+  </div>
+{/if}
+
+{#if app.project.persons.length === 0}
+  <div class="alert alert-info">
+    Noch keine Teilnehmer. entweder importieren oder von Hand hinzufügen.
+  </div>
+{:else}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead>
+        <tr>
+          <th style="width: 3rem;"></th>
+          <th style="width: 3rem;" class="text-secondary">#</th>
+          <th style="min-width: 12rem;">Name</th>
+          <th>Wünsche</th>
+          <th style="width: 4rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each filteredPersons as person, i (person.id)}
+          <tr>
+            <td>
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                aria-label="Wünsche bearbeiten"
+                onclick={() => (expandedId = expandedId === person.id ? null : person.id)}
+              >
+                <i class="bi {expandedId === person.id ? 'bi-chevron-up' : 'bi-chevron-down'}"></i>
+              </button>
+            </td>
+            <td class="text-secondary">{i + 1}</td>
+            <td
+              ><input
+                class="form-control form-control-sm border-0 bg-transparent px-1"
+                bind:value={person.name}
+                aria-label="Name"
+              /></td
+            >
+            <td>
+              {#if app.wishesOf(person.id).length === 0}
+                <span class="text-danger"
+                  ><i class="bi bi-exclamation-circle me-1"></i>keine Wünsche</span
+                >
+              {:else}
+                {#each app.wishesOf(person.id) as wish (wish.workshopId)}
+                  <span class="badge text-bg-light border me-1">
+                    <strong>{wish.rank}.</strong>
+                    {workshopName(wish.workshopId)}
+                    <span class="text-secondary small">({slotName(wish.workshopId)})</span>
+                  </span>
+                {/each}
+              {/if}
+            </td>
+            <td>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                title="Löschen"
+                onclick={() => removePersonConfirm(person.id, person.name)}
+              >
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+          {#if expandedId === person.id}
+            <tr>
+              <td colspan="5" class="bg-light">
+                <div class="row g-2 align-items-center">
+                  {#each app.wishesOf(person.id) as wish (wish.workshopId)}
+                    <div class="col-12 col-md-6 col-lg-4 d-flex gap-2">
+                      <input
+                        class="form-control form-control-sm"
+                        type="number"
+                        min="1"
+                        style="width: 5rem;"
+                        bind:value={wish.rank}
+                        aria-label="Wunsch-Rang"
+                      />
+                      <select
+                        class="form-select form-select-sm"
+                        bind:value={wish.workshopId}
+                        aria-label="Workshop"
+                      >
+                        <option value={wish.workshopId}>{workshopName(wish.workshopId)}</option>
+                        {#each availableWorkshops(person.id, wish.workshopId) as w (w.id)}
+                          <option value={w.id}>{w.name} ({slotName(w.id)})</option>
+                        {/each}
+                      </select>
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        title="Wunsch entfernen"
+                        onclick={() => app.removeWish(person.id, wish.workshopId)}
+                      >
+                        <i class="bi bi-x-lg"></i>
+                      </button>
+                    </div>
+                  {/each}
+                  {#if app.project.workshops.length > app.wishesOf(person.id).length}
+                    <div class="col-12 col-md-6 col-lg-4">
+                      <select
+                        class="form-select form-select-sm"
+                        aria-label="Wunsch hinzufügen"
+                        onchange={(e) => {
+                          const id = (e.target as HTMLSelectElement).value;
+                          if (id) app.addWish(person.id, id);
+                          (e.target as HTMLSelectElement).value = "";
+                        }}
+                      >
+                        <option value="">+ Wunsch hinzufügen …</option>
+                        {#each availableWorkshops(person.id, "") as w (w.id)}
+                          <option value={w.id}>{w.name} ({slotName(w.id)})</option>
+                        {/each}
+                      </select>
+                    </div>
+                  {/if}
+                </div>
+                <p class="small text-secondary mb-0 mt-2">
+                  Rang 1 = Erstwunsch. Workshops im selben Slot konkurrieren — es zählt jeweils die
+                  beste erreichbare Zuweisung.
+                </p>
+              </td>
+            </tr>
+          {/if}
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
+<ImportDialog bind:open={showImport} onDone={(s) => (lastSummary = s)} />

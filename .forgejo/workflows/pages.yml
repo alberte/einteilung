@@ -1,0 +1,39 @@
+name: Build & Deploy (Codeberg Pages)
+# Baut die App und veröffentlicht dist/ auf dem pages-Branch.
+# Vorbereitung (einmalig):
+#   1. Repo auf Codeberg anlegen (leer, ohne README-Verzweigungskonflikt)
+#   2. PAT mit Schreibrecht anlegen: Codeberg -> Einstellungen -> Anwendungen
+#      -> Access Tokens (Scope: repository) und als Repo-Secret
+#      "PAGES_TOKEN" hinterlegen (Einstellungen -> Actions -> Secrets)
+#   3. Forgejo Actions fur das Repo aktivieren (Einstellungen -> Actions)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Abhängigkeiten installieren
+        run: npm ci
+      - name: Tests (Solver-Kern)
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Auf pages-Branch veröffentlichen
+        env:
+          PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          cd dist
+          git init -q -b pages .
+          git config user.name "pages-bot"
+          git config user.email "pages-bot@users.noreply.codeberg.org"
+          git add -A
+          git commit -qm "Deploy von Commit $GITHUB_SHA"
+          git push -qf "https://oauth2:${PAGES_TOKEN}@codeberg.org/${REPO}.git" pages:pages

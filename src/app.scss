@@ -1,0 +1,40 @@
+// Bootstrap wird über Sass gebündelt, damit Anpassungen (Farben, Optionen)
+// ohne kompiliertes CSS möglich sind (Projektplan A3).
+@import "bootstrap/scss/bootstrap";
+
+body {
+  background-color: #f6f8fb;
+}
+
+.nav-tabs .nav-link {
+  cursor: pointer;
+}
+
+table td {
+  vertical-align: middle;
+}
+
+// Zuweisungen ohne erfüllten Wunsch rot markieren (Projektplan, Abschnitt 6)
+.from-no-wish {
+  color: var(--bs-danger);
+  font-weight: 600;
+}
+
+// Kachel-Ansicht der Workshops im Ergebnis-Tab
+.workshop-card {
+  min-width: 15rem;
+}
+
+.slot-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.workshop-count-ok {
+  background-color: var(--bs-success-bg-subtle);
+}
+
+.workshop-count-low {
+  background-color: var(--bs-warning-bg-subtle);
+}
