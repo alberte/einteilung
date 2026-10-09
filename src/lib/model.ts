@@ -149,12 +149,17 @@ export function normalizeProject(raw: unknown): Project {
     const list = Array.isArray(rawWishes[p.id])
       ? (rawWishes[p.id] as Record<string, unknown>[])
       : [];
-    wishes[p.id] = list
-      .map((w) => ({
-        workshopId: str(w.workshopId, ""),
-        rank: Math.max(1, Math.floor(Number(w.rank) || 1)),
-      }))
-      .filter((w) => workshopIds.has(w.workshopId));
+    // gültige Wünsche, je Workshop der beste Rang, Ränge dann als 1..n
+    const byWorkshop = new Map<string, number>();
+    for (const raw of list) {
+      const workshopId = str(raw.workshopId, "");
+      if (!workshopIds.has(workshopId)) continue;
+      const rank = Math.max(1, Math.floor(Number(raw.rank) || 1));
+      byWorkshop.set(workshopId, Math.min(byWorkshop.get(workshopId) ?? rank, rank));
+    }
+    wishes[p.id] = [...byWorkshop.entries()]
+      .sort((a, b) => a[1] - b[1])
+      .map(([workshopId], i) => ({ workshopId, rank: i + 1 }));
   }
 
   const rawConfig = (data.config ?? {}) as Record<string, unknown>;

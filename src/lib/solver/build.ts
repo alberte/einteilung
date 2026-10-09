@@ -101,6 +101,14 @@ export function buildModel(
     }
   }
 
+  /** Alle Instanzen der Gruppe eines Workshops (oder nur der Workshop selbst). */
+  const groupMembersOf = (workshopId: string): string[] => {
+    const w = workshopById.get(workshopId);
+    if (!w?.groupId) return [workshopId];
+    const list = groups.get(w.groupId);
+    return list && list.length >= 2 ? list.map((x) => x.id) : [workshopId];
+  };
+
   // Koppel-Paare: x[a] = x[b] pro Person (a + b = 0 mit Vorzeichen +/-1)
   const pairs = pairsOf(workshops, workshopById);
   const pairOf = new Map<string, { key: string; sign: number }>();
@@ -134,14 +142,21 @@ export function buildModel(
     ints[name] = 1;
   };
 
-  // Stufe A: Wunsch-Variablen (Duplikate pro Person/Workshop: bester Rang)
+  // Stufe A: Wunsch-Variablen.
+  // Ein Wunsch auf eine Instanz einer verbundenen Gruppe gilt für ALLE
+  // Durchführungen des Workshops (gleicher Rang) — es ist egal, welche
+  // Instanz die Person am Ende besucht.
+  // (Duplikate pro Person/Workshop: bester Rang)
   const bestRank = new Map<string, number>();
   for (const p of persons) {
     bestRank.clear();
     for (const wish of input.wishes[p.id] ?? []) {
       if (!workshopById.has(wish.workshopId)) continue;
-      const prev = bestRank.get(wish.workshopId);
-      if (prev === undefined || wish.rank < prev) bestRank.set(wish.workshopId, wish.rank);
+      const members = groupMembersOf(wish.workshopId);
+      for (const memberId of members) {
+        const prev = bestRank.get(memberId);
+        if (prev === undefined || wish.rank < prev) bestRank.set(memberId, wish.rank);
+      }
     }
     for (const [workshopId, rank] of bestRank) {
       addVar(

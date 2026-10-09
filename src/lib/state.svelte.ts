@@ -52,19 +52,28 @@ class AppState {
   }
 
   // --- Verbindungen zwischen Workshops -------------------------------
-  /** Instanzen-Gruppe: derselbe Workshop in einem anderen Slot (max. 1× pro Person). */
-  linkSameWorkshop(workshopId: string, targetId: string | null) {
+  /**
+   * Instanzen-Gruppe: setzt die Durchführung des Workshops in einem bestimmten
+   * Slot. Pro Slot ist maximal eine Instanz möglich; dadurch kann eine Gruppe
+   * höchstens so viele Instanzen haben wie es Slots gibt. null entfernt die
+   * Instanz aus der Gruppe.
+   */
+  setGroupInstance(workshopId: string, slotId: string, targetId: string | null) {
     const w = this.project.workshops.find((x) => x.id === workshopId);
     if (!w) return;
-    if (!targetId) {
-      w.groupId = null;
-      return;
+    // Bisherige Instanz der Gruppe in diesem Slot ersetzen
+    if (w.groupId) {
+      for (const x of this.project.workshops) {
+        if (x.groupId === w.groupId && x.slotId === slotId && x.id !== w.id) {
+          x.groupId = null;
+        }
+      }
     }
+    if (!targetId) return;
     const t = this.project.workshops.find((x) => x.id === targetId);
-    if (!t || t.id === w.id) return;
-    const gid = w.groupId ?? t.groupId ?? uid();
-    w.groupId = gid;
-    t.groupId = gid;
+    if (!t || t.id === w.id || t.slotId !== slotId) return;
+    if (!w.groupId) w.groupId = uid();
+    t.groupId = w.groupId;
   }
 
   /** Kopplung: beide Workshops nur zusammen oder gar nicht (symmetrisch). */
@@ -127,14 +136,34 @@ class AppState {
   addWish(personId: string, workshopId: string) {
     const wishes = this.wishesOf(personId);
     if (wishes.some((w) => w.workshopId === workshopId)) return;
-    const nextRank = wishes.reduce((acc, w) => Math.max(acc, w.rank), 0) + 1;
-    wishes.push({ workshopId, rank: nextRank });
+    wishes.push({ workshopId, rank: wishes.length + 1 });
   }
 
   removeWish(personId: string, workshopId: string) {
     const wishes = this.wishesOf(personId);
     const idx = wishes.findIndex((w) => w.workshopId === workshopId);
-    if (idx >= 0) wishes.splice(idx, 1);
+    if (idx < 0) return;
+    wishes.splice(idx, 1);
+    this.renumberWishes(wishes);
+  }
+
+  /** Wunsch in der Rangfolge um eine Position verschieben (-1 = hoch, +1 = runter). */
+  moveWish(personId: string, workshopId: string, direction: -1 | 1) {
+    const wishes = this.wishesOf(personId);
+    const sorted = [...wishes].sort((a, b) => a.rank - b.rank);
+    const idx = sorted.findIndex((w) => w.workshopId === workshopId);
+    const target = idx + direction;
+    if (idx < 0 || target < 0 || target >= sorted.length) return;
+    const [moved] = sorted.splice(idx, 1);
+    sorted.splice(target, 0, moved);
+    this.wishesOf(personId).splice(0, wishes.length, ...sorted);
+    this.renumberWishes(this.wishesOf(personId));
+  }
+
+  /** Ränge aufeinanderfolgend als 1..n vergeben (Position = Rang). */
+  private renumberWishes(wishes: Wish[]) {
+    const sorted = [...wishes].sort((a, b) => a.rank - b.rank);
+    sorted.forEach((w, i) => (w.rank = i + 1));
   }
 
   // --- Projekt -----------------------------------------------------------

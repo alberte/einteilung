@@ -58,12 +58,18 @@
     return app.project.workshops.find((x) => x.id === w.pairedWith)?.name ?? null;
   }
 
-  /** Repräsentant der Instanzen-Gruppe für die Select-Anzeige (erster anderer). */
-  function groupTargetOf(w: { id: string; groupId?: string | null }): string {
+  /** Aktuelle Gruppen-Instanz des Workshops in einem Slot ("" = keine). */
+  function groupInstanceInSlot(w: { id: string; groupId?: string | null }, slotId: string): string {
     if (!w.groupId) return "";
-    const other = app.project.workshops.find((x) => x.groupId === w.groupId && x.id !== w.id);
-    return other?.id ?? "";
+    const instance = app.project.workshops.find(
+      (x) => x.groupId === w.groupId && x.slotId === slotId && x.id !== w.id,
+    );
+    return instance?.id ?? "";
   }
+
+  const otherSlots = $derived(
+    linkWorkshop ? app.project.slots.filter((s) => s.id !== linkWorkshop!.slotId) : [],
+  );
 </script>
 
 <div class="row g-4">
@@ -320,27 +326,32 @@
         </div>
         <div class="modal-body">
           <div class="mb-4">
-            <label class="form-label fw-semibold" for="link-group"
-              >Gleicher Workshop in anderem Slot</label
-            >
-            <select
-              id="link-group"
-              class="form-select"
-              value={groupTargetOf(linkWorkshop)}
-              onchange={(e) =>
-                app.linkSameWorkshop(
-                  linkWorkshop!.id,
-                  (e.target as HTMLSelectElement).value || null,
-                )}
-            >
-              <option value="">— keine Verbindung —</option>
-              {#each targets as t (t.id)}
-                <option value={t.id}>{t.name} ({slotNameOf(t.slotId)})</option>
-              {/each}
-            </select>
+            <div class="form-label fw-semibold">Gleicher Workshop — weitere Durchführungen</div>
+            {#each otherSlots as slot (slot.id)}
+              <label class="form-label small mb-1" for="link-group-{slot.id}">
+                Instanz in „{slot.name}“
+              </label>
+              <select
+                id="link-group-{slot.id}"
+                class="form-select mb-2"
+                value={groupInstanceInSlot(linkWorkshop, slot.id)}
+                onchange={(e) =>
+                  app.setGroupInstance(
+                    linkWorkshop!.id,
+                    slot.id,
+                    (e.target as HTMLSelectElement).value || null,
+                  )}
+              >
+                <option value="">— keine —</option>
+                {#each workshopsInSlot(app.project, slot.id) as t (t.id)}
+                  <option value={t.id}>{t.name}</option>
+                {/each}
+              </select>
+            {/each}
             <div class="form-text">
-              Verbindet Instanzen desselben Workshops über Slots hinweg: Der Workshop „läuft
-              mehrfach“, aber jede Person erhält davon höchstens eine Instanz.
+              Verbindet Durchführungen desselben Workshops über Slots hinweg: Der Workshop „läuft
+              mehrfach“, aber jede Person erhält ihn höchstens einmal. Pro Slot ist eine Instanz
+              möglich — Wünsche auf eine Durchführung zählen für alle.
             </div>
           </div>
           <div>

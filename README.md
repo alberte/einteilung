@@ -17,13 +17,16 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
 1. **Slots & Workshops** — Slots (Zeitblöcke) anlegen, Workshops mit
    min/max je Slot eintragen. Über das Ketten-Symbol lassen sich
    Workshops verbinden:
-   - **Gleicher Workshop in anderem Slot** (Instanzen-Gruppe): Der
-     Workshop läuft mehrfach, jede Person erhält ihn höchstens einmal.
+   - **Gleicher Workshop — weitere Durchführungen**: Pro Slot eine
+     Instanz auswählen (bis zu einer Durchführung je Slot). Der
+     Workshop „läuft mehrfach“, jede Person erhält ihn höchstens
+     einmal; ein Wunsch auf eine Durchführung zählt für alle.
    - **Gekoppelter Partner** (immer zusammen): Beide Workshops werden
      von jeder Person nur zusammen oder gar nicht besucht — für
      zweiteilige Workshops über zwei Slots.
 2. **Teilnehmer & Wünsche** — CSV/XLSX importieren (Spalten-Mapping im
-   Dialog) oder Personen von Hand anlegen; Wünsche inline korrigieren.
+   Dialog) oder Personen von Hand anlegen; Wünsche per Hoch/Runter-
+   Pfeilen in der Priorität sortieren (Rang = Position, kein Tippen).
    Importformat: eine Zeile pro Person, eine Namens-Spalte und
    Wunsch-Spalten in Rangfolge (Wunsch 1 = Erstwunsch, Workshop-Namen wie
    angelegt, Groß-/Kleinschreibung egal).

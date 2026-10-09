@@ -292,11 +292,38 @@ describe("solve — Verbindungen", () => {
     expect(r.status).toBe("optimal");
     if (r.status !== "optimal") return;
     const ids = r.assignments.map((a) => a.workshopId);
-    // Erstwünsche A1 (S1) und B2 (S2); A2 (gleiche Gruppe wie A1) bleibt frei
-    expect(ids).toContain("A1");
-    expect(ids).toContain("B2");
+    // p1 erhält „A“ genau einmal (A1 oder A2) plus Erstwunsch B2
     expect(ids.filter((id) => id === "A1" || id === "A2").length).toBe(1);
+    expect(ids).toContain("B2");
     expect(r.assignments.length).toBe(2);
+    expect(r.stats.nonWish).toBe(0);
+  });
+
+  it("Wunsch auf eine Durchführung gilt für alle Instanzen der Gruppe", () => {
+    // p1 und p2 wünschen nur A1 — A1 fasst eine Person. Dank Gruppen-Wunsch
+    // bekommt die zweite Person A2 (andere Durchführung) als Erstwunsch.
+    const r = solve(
+      mk({
+        slots: ["S1", "S2"],
+        workshops: [
+          ["A1", "S1", 0, 1, null, "G"],
+          ["A2", "S2", 0, 1, null, "G"],
+          ["B1", "S1", 0, 1],
+          ["B2", "S2", 0, 1],
+        ],
+        wishes: { p1: [["A1", 1]], p2: [["A1", 1]] },
+        n: 1,
+      }),
+    );
+    expect(r.status).toBe("optimal");
+    if (r.status !== "optimal") return;
+    const aP = r.assignments.filter((a) => a.workshopId === "A1" || a.workshopId === "A2");
+    expect(aP.length).toBe(2);
+    expect(aP.filter((a) => a.workshopId === "A1").length).toBe(1);
+    expect(aP.filter((a) => a.workshopId === "A2").length).toBe(1);
+    // beide Zuweisungen zählen als erfüllter Erstwunsch
+    expect(aP.every((a) => a.fromWish && a.rank === 1)).toBe(true);
+    expect(r.stats.nonWish).toBe(0);
   });
 
   it("Instanzen-Gruppe: Zweitinstanz statt Überlauf bei vollem Ersttermin", () => {
@@ -333,6 +360,8 @@ describe("solve — Verbindungen", () => {
     expect(aVisitors.filter((a) => a.workshopId === "A2").length).toBe(1);
     expect(aVisitors.filter((a) => a.personId === "p1").length).toBe(1);
     expect(aVisitors.filter((a) => a.personId === "p2").length).toBe(1);
+    // beide „A“-Zuweisungen sind erfüllte Wünsche (Gruppe deckt beide Durchführungen ab)
+    expect(aVisitors.every((a) => a.fromWish)).toBe(true);
   });
 
   it("Kopplung: gekoppelter Partner wird mitgezogen, auch ohne Wunsch", () => {

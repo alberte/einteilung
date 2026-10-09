@@ -38,6 +38,11 @@
     return w ? (app.project.slots.find((s) => s.id === w.slotId)?.name ?? "?") : "?";
   }
 
+  /** Wünsche in Prioritätsreihenfolge (Rang 1 zuerst). */
+  function sortedWishes(personId: string) {
+    return [...app.wishesOf(personId)].sort((a, b) => a.rank - b.rank);
+  }
+
   /** Workshops, die für eine zusätzliche Wunschauswahl noch verfügbar sind. */
   function availableWorkshops(personId: string, currentWorkshopId: string) {
     const used = new Set(
@@ -170,7 +175,7 @@
                   ><i class="bi bi-exclamation-circle me-1"></i>keine Wünsche</span
                 >
               {:else}
-                {#each app.wishesOf(person.id) as wish (wish.workshopId)}
+                {#each [...app.wishesOf(person.id)].sort((a, b) => a.rank - b.rank) as wish (wish.workshopId)}
                   <span class="badge text-bg-light border me-1">
                     <strong>{wish.rank}.</strong>
                     {workshopName(wish.workshopId)}
@@ -193,16 +198,29 @@
             <tr>
               <td colspan="5" class="bg-light">
                 <div class="row g-2 align-items-center">
-                  {#each app.wishesOf(person.id) as wish (wish.workshopId)}
-                    <div class="col-12 col-md-6 col-lg-4 d-flex gap-2">
-                      <input
-                        class="form-control form-control-sm"
-                        type="number"
-                        min="1"
-                        style="width: 5rem;"
-                        bind:value={wish.rank}
-                        aria-label="Wunsch-Rang"
-                      />
+                  {#each sortedWishes(person.id) as wish, idx (wish.workshopId)}
+                    <div class="col-12 col-md-6 col-lg-4 d-flex gap-2 align-items-center">
+                      <div class="d-flex flex-column gap-1">
+                        <button
+                          class="btn btn-sm btn-outline-secondary py-0 px-1"
+                          title="höher priorisieren"
+                          aria-label="Wunsch „{workshopName(wish.workshopId)}“ nach oben"
+                          disabled={idx === 0}
+                          onclick={() => app.moveWish(person.id, wish.workshopId, -1)}
+                        >
+                          <i class="bi bi-chevron-up"></i>
+                        </button>
+                        <button
+                          class="btn btn-sm btn-outline-secondary py-0 px-1"
+                          title="niedriger priorisieren"
+                          aria-label="Wunsch „{workshopName(wish.workshopId)}“ nach unten"
+                          disabled={idx === sortedWishes(person.id).length - 1}
+                          onclick={() => app.moveWish(person.id, wish.workshopId, 1)}
+                        >
+                          <i class="bi bi-chevron-down"></i>
+                        </button>
+                      </div>
+                      <span class="badge text-bg-primary" title="Priorität">{idx + 1}.</span>
                       <select
                         class="form-select form-select-sm"
                         bind:value={wish.workshopId}
@@ -242,8 +260,8 @@
                   {/if}
                 </div>
                 <p class="small text-secondary mb-0 mt-2">
-                  Rang 1 = Erstwunsch. Workshops im selben Slot konkurrieren — es zählt jeweils die
-                  beste erreichbare Zuweisung.
+                  Reihenfolge per Pfeil = Priorität (1. = Erstwunsch). Bei verbundenen Workshops
+                  gilt der Wunsch für alle Durchführungen; Workshops im selben Slot konkurrieren.
                 </p>
               </td>
             </tr>
