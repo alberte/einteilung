@@ -38,6 +38,32 @@
   function slotMinSum(slotId: string): number {
     return workshopsInSlot(app.project, slotId).reduce((acc, w) => acc + w.min, 0);
   }
+
+  // --- Verbindungen zwischen Workshops -------------------------------
+  let linkWorkshopId = $state<string | null>(null);
+
+  const linkWorkshop = $derived(app.project.workshops.find((w) => w.id === linkWorkshopId) ?? null);
+
+  function slotNameOf(slotId: string): string {
+    return app.project.slots.find((s) => s.id === slotId)?.name ?? "?";
+  }
+
+  function groupCount(w: { groupId?: string | null }): number {
+    if (!w.groupId) return 0;
+    return app.project.workshops.filter((x) => x.groupId === w.groupId).length;
+  }
+
+  function partnerName(w: { pairedWith?: string | null }): string | null {
+    if (!w.pairedWith) return null;
+    return app.project.workshops.find((x) => x.id === w.pairedWith)?.name ?? null;
+  }
+
+  /** Repräsentant der Instanzen-Gruppe für die Select-Anzeige (erster anderer). */
+  function groupTargetOf(w: { id: string; groupId?: string | null }): string {
+    if (!w.groupId) return "";
+    const other = app.project.workshops.find((x) => x.groupId === w.groupId && x.id !== w.id);
+    return other?.id ?? "";
+  }
 </script>
 
 <div class="row g-4">
@@ -171,6 +197,7 @@
                     <th style="min-width: 10rem;">Slot</th>
                     <th style="width: 6rem;">min</th>
                     <th style="width: 6rem;">max</th>
+                    <th style="min-width: 9rem;">Verbindung</th>
                     <th style="width: 4rem;"></th>
                   </tr>
                 </thead>
@@ -214,6 +241,34 @@
                         /></td
                       >
                       <td>
+                        <div class="d-flex gap-1 flex-wrap align-items-center">
+                          {#if w.groupId && groupCount(w) > 1}
+                            <span
+                              class="badge text-bg-info"
+                              title="Gleicher Workshop in mehreren Slots — jede Person erhält höchstens eine Instanz"
+                            >
+                              <i class="bi bi-layers me-1"></i>{groupCount(w)}× Instanz
+                            </span>
+                          {/if}
+                          {#if w.pairedWith}
+                            <span
+                              class="badge text-bg-warning text-dark"
+                              title="Gekoppelt — wird von jeder Person nur zusammen mit dem Partner besucht"
+                            >
+                              <i class="bi bi-link-45deg me-1"></i>{partnerName(w)}
+                            </span>
+                          {/if}
+                          <button
+                            class="btn btn-sm btn-outline-secondary"
+                            title="Workshop verbinden / koppeln"
+                            aria-label="Workshop {w.name} verbinden"
+                            onclick={() => (linkWorkshopId = w.id)}
+                          >
+                            <i class="bi bi-link-45deg"></i>
+                          </button>
+                        </div>
+                      </td>
+                      <td>
                         <button
                           class="btn btn-sm btn-outline-danger"
                           title="Workshop löschen"
@@ -228,8 +283,9 @@
               </table>
             </div>
             <p class="small text-secondary mb-0">
-              Zeilen rot markiert: min &gt; max. Workshops, die dieselbe Zeit (Slot) haben, können
-              von einer Person nicht beide besucht werden.
+              Zeilen rot markiert: min &gt; max. Badge „× Instanz“: derselbe Workshop in mehreren
+              Slots (jede Person erhält ihn höchstens einmal). Ketten-Badge: gekoppelte Workshops,
+              die nur zusammen besucht werden.
             </p>
           {/if}
         {/if}
@@ -237,3 +293,85 @@
     </div>
   </div>
 </div>
+
+{#if linkWorkshop}
+  {@const targets = app.project.workshops.filter(
+    (t) => t.slotId !== linkWorkshop!.slotId && t.id !== linkWorkshop!.id,
+  )}
+  <div
+    class="modal d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Workshop verbinden"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-link-45deg me-2"></i>Workshop „{linkWorkshop.name}“ verbinden
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Schließen"
+            onclick={() => (linkWorkshopId = null)}
+          ></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-4">
+            <label class="form-label fw-semibold" for="link-group"
+              >Gleicher Workshop in anderem Slot</label
+            >
+            <select
+              id="link-group"
+              class="form-select"
+              value={groupTargetOf(linkWorkshop)}
+              onchange={(e) =>
+                app.linkSameWorkshop(
+                  linkWorkshop!.id,
+                  (e.target as HTMLSelectElement).value || null,
+                )}
+            >
+              <option value="">— keine Verbindung —</option>
+              {#each targets as t (t.id)}
+                <option value={t.id}>{t.name} ({slotNameOf(t.slotId)})</option>
+              {/each}
+            </select>
+            <div class="form-text">
+              Verbindet Instanzen desselben Workshops über Slots hinweg: Der Workshop „läuft
+              mehrfach“, aber jede Person erhält davon höchstens eine Instanz.
+            </div>
+          </div>
+          <div>
+            <label class="form-label fw-semibold" for="link-pair"
+              >Gekoppelter Partner — immer zusammen</label
+            >
+            <select
+              id="link-pair"
+              class="form-select"
+              value={linkWorkshop.pairedWith ?? ""}
+              onchange={(e) =>
+                app.pairWorkshops(linkWorkshop!.id, (e.target as HTMLSelectElement).value || null)}
+            >
+              <option value="">— kein Partner —</option>
+              {#each targets as t (t.id)}
+                <option value={t.id}>{t.name} ({slotNameOf(t.slotId)})</option>
+              {/each}
+            </select>
+            <div class="form-text">
+              Beide Workshops werden von jeder Person nur zusammen oder gar nicht besucht — für
+              zweiteilige Workshops über zwei Slots (z. B. Teil 1 + Teil 2).
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick={() => (linkWorkshopId = null)}>
+            Fertig
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop show"></div>
+{/if}

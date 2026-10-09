@@ -25,6 +25,45 @@ export interface BuiltModel {
   varCount: number;
 }
 
+/** Kanonischer Schlüssel eines Koppel-Paars (unabhängig von der Richtung). */
+export function pairKeyOf(aId: string, bId: string): string {
+  return [aId, bId].sort().join("|");
+}
+
+/** Instanzen-Gruppen: groupId -> Workshops (nur Gruppen mit >= 2 Instanzen). */
+function groupsOf(workshops: { id: string; groupId?: string | null }[]) {
+  const groups = new Map<string, { id: string; groupId?: string | null }[]>();
+  for (const w of workshops) {
+    if (!w.groupId) continue;
+    const list = groups.get(w.groupId) ?? [];
+    list.push(w);
+    groups.set(w.groupId, list);
+  }
+  for (const [gid, list] of groups) {
+    if (list.length < 2) groups.delete(gid);
+  }
+  return groups;
+}
+
+/** Kanonische Koppel-Paare (jedes Paar genau einmal). */
+function pairsOf(
+  workshops: { id: string; pairedWith?: string | null }[],
+  workshopById: Map<string, { id: string; pairedWith?: string | null }>,
+): { a: string; b: string; key: string }[] {
+  const pairs: { a: string; b: string; key: string }[] = [];
+  const seen = new Set<string>();
+  for (const w of workshops) {
+    const partner = w.pairedWith ? workshopById.get(w.pairedWith) : undefined;
+    if (!partner || partner.id === w.id) continue;
+    const key = pairKeyOf(w.id, partner.id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const [a, b] = [w.id, partner.id].sort();
+    pairs.push({ a, b, key });
+  }
+  return pairs;
+}
+
 /**
  * @param includeNonWish false: nur Wunsch-Variablen (Stufe A — schnell).
  *                       true: zusätzlich alle restlichen Paare (Stufe B,
@@ -53,16 +92,44 @@ export function buildModel(
     constraints[`w_${w.id}`] = { min: w.min, max: w.max };
   }
 
+  // Instanzen-Gruppen: höchstens eine Instanz pro Person
+  const groups = groupsOf(workshops);
+  const groupIds = new Set(groups.keys());
+  for (const gid of groupIds) {
+    for (const p of persons) {
+      constraints[`g_${p.id}_${gid}`] = { max: 1 };
+    }
+  }
+
+  // Koppel-Paare: x[a] = x[b] pro Person (a + b = 0 mit Vorzeichen +/-1)
+  const pairs = pairsOf(workshops, workshopById);
+  const pairOf = new Map<string, { key: string; sign: number }>();
+  for (const pair of pairs) {
+    pairOf.set(pair.a, { key: pair.key, sign: 1 });
+    pairOf.set(pair.b, { key: pair.key, sign: -1 });
+    for (const p of persons) {
+      constraints[`pair_${p.id}_${pair.key}`] = { equal: 0 };
+    }
+  }
+
   const addVar = (meta: VarMeta, cost: number) => {
     const w = workshopById.get(meta.workshopId)!;
     const name = `x_${meta.personId}|${meta.workshopId}`;
     if (variables[name]) return;
-    variables[name] = {
+    const coefficients: Record<string, number> = {
       [`p_${meta.personId}`]: 1,
       [`ps_${meta.personId}_${w.slotId}`]: 1,
       [`w_${w.id}`]: 1,
-      cost,
     };
+    if (w.groupId && groupIds.has(w.groupId)) {
+      coefficients[`g_${meta.personId}_${w.groupId}`] = 1;
+    }
+    const pair = pairOf.get(w.id);
+    if (pair) {
+      coefficients[`pair_${meta.personId}_${pair.key}`] = pair.sign;
+    }
+    coefficients.cost = cost;
+    variables[name] = coefficients;
     varMeta[name] = meta;
     ints[name] = 1;
   };

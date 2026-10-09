@@ -15,7 +15,13 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
 ## Bedienung (Kurzführung)
 
 1. **Slots & Workshops** — Slots (Zeitblöcke) anlegen, Workshops mit
-   min/max je Slot eintragen.
+   min/max je Slot eintragen. Über das Ketten-Symbol lassen sich
+   Workshops verbinden:
+   - **Gleicher Workshop in anderem Slot** (Instanzen-Gruppe): Der
+     Workshop läuft mehrfach, jede Person erhält ihn höchstens einmal.
+   - **Gekoppelter Partner** (immer zusammen): Beide Workshops werden
+     von jeder Person nur zusammen oder gar nicht besucht — für
+     zweiteilige Workshops über zwei Slots.
 2. **Teilnehmer & Wünsche** — CSV/XLSX importieren (Spalten-Mapping im
    Dialog) oder Personen von Hand anlegen; Wünsche inline korrigieren.
    Importformat: eine Zeile pro Person, eine Namens-Spalte und
@@ -76,7 +82,9 @@ src/
 
 - Binär-LP/MIP mit `javascript-lp-solver` (reines JS, A4). Variablen
   `x[Person, Workshop]`, Nebenbedingungen: Σ pro Person = n, Σ pro
-  Person+Slot ≤ 1, min ≤ Σ pro Workshop ≤ max; Ziel: minimierte
+  Person+Slot ≤ 1, min ≤ Σ pro Workshop ≤ max, Instanzen-Gruppen
+  (Σ pro Person+Gruppe ≤ 1, „gleicher Workshop“), Koppel-Paare
+  (x[a] = x[b] pro Person, „immer zusammen“); Ziel: minimierte
   Rangstrafe (linear oder quadratisch, konfigurierbar).
 - **Zwei Stufen**: Zuerst nur Wunsch-Variablen — ist dieses Modell
   lösbar, ist die Lösung global optimal (Zuweisungen ohne Wunsch sind

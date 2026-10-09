@@ -78,5 +78,29 @@ export function diagnose(input: SolveInput): string[] {
     );
   }
 
+  // Koppel-Paare: Belegung von a und b ist zwangsläufig gleich
+  const workshopById = new Map(workshops.map((w) => [w.id, w]));
+  const seenPairs = new Set<string>();
+  for (const w of workshops) {
+    const partner = w.pairedWith ? workshopById.get(w.pairedWith) : undefined;
+    if (!partner || partner.id === w.id) continue;
+    const key = [w.id, partner.id].sort().join("|");
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+    if (w.slotId === partner.slotId) {
+      reasons.push(
+        `„${w.name}“ und „${partner.name}“ sind gekoppelt, liegen aber im selben Slot — beide zusammen sind dort nicht möglich.`,
+      );
+      continue;
+    }
+    const lo = Math.max(w.min, partner.min);
+    const hi = Math.min(w.max, partner.max, P);
+    if (lo > hi) {
+      reasons.push(
+        `„${w.name}“ und „${partner.name}“ sind gekoppelt: Die gemeinsame Belegung müsste mindestens ${lo}, darf aber höchstens ${hi} Personen umfassen — kein Wert ist möglich.`,
+      );
+    }
+  }
+
   return reasons;
 }

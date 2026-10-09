@@ -23,11 +23,49 @@ export function validateProject(project: Project): Validation {
   }
 
   const workshopIds = new Set(project.workshops.map((w) => w.id));
+  const workshopById = new Map(project.workshops.map((w) => [w.id, w]));
+  const hasPairs = project.workshops.some((w) => w.pairedWith);
+  const seenPairs = new Set<string>();
   for (const w of project.workshops) {
     if (w.min > w.max) errors.push(`Workshop „${w.name}“: min (${w.min}) > max (${w.max}).`);
     if (!project.slots.some((s) => s.id === w.slotId)) {
       errors.push(`Workshop „${w.name}“ gehört zu keinem existierenden Slot.`);
     }
+    if (w.groupId) {
+      const sameSlotInstances = project.workshops.filter(
+        (x) => x.groupId === w.groupId && x.slotId === w.slotId && x.id !== w.id,
+      );
+      if (sameSlotInstances.length > 0) {
+        warnings.push(
+          `Slot „${project.slots.find((s) => s.id === w.slotId)?.name ?? "?"}“ enthält mehrere verbundene Instanzen von „${w.name}“ — redundant, da pro Slot ohnehin nur ein Workshop möglich ist.`,
+        );
+      }
+    }
+    const partner = w.pairedWith ? workshopById.get(w.pairedWith) : undefined;
+    if (w.pairedWith && !partner) {
+      errors.push(`Workshop „${w.name}“ verweist auf einen nicht existierenden Koppel-Partner.`);
+      continue;
+    }
+    if (!partner) continue;
+    const key = [w.id, partner.id].sort().join("|");
+    if (seenPairs.has(key)) continue;
+    seenPairs.add(key);
+    if (partner.slotId === w.slotId) {
+      errors.push(
+        `„${w.name}“ und „${partner.name}“ sind gekoppelt, liegen aber im selben Slot — beide zusammen sind dort nicht möglich.`,
+      );
+    } else if (w.min !== partner.min || w.max !== partner.max) {
+      const lo = Math.max(w.min, partner.min);
+      const hi = Math.min(w.max, partner.max);
+      warnings.push(
+        `Gekoppelt „${w.name}“/„${partner.name}“: abweichende Belegungsgrenzen — effektiv gilt ${lo}–${hi} Personen für beide.`,
+      );
+    }
+  }
+  if (hasPairs && project.config.n < 2) {
+    warnings.push(
+      "Bei n < 2 können gekoppelte Workshops niemandem zugeteilt werden (beide belegen je einen Slot).",
+    );
   }
 
   const nameCount = new Map<string, number>();

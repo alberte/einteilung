@@ -16,6 +16,8 @@ export function toSolveInput(project: Project): SolveInput {
       slotId: w.slotId,
       min: w.min,
       max: w.max,
+      groupId: w.groupId ?? null,
+      pairedWith: w.pairedWith ?? null,
     })),
     slots: project.slots.map((s) => ({ id: s.id, name: s.name })),
     config: {

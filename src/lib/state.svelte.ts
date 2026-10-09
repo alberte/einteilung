@@ -51,7 +51,47 @@ class AppState {
     this.removeWorkshopsByIds(new Set([id]));
   }
 
+  // --- Verbindungen zwischen Workshops -------------------------------
+  /** Instanzen-Gruppe: derselbe Workshop in einem anderen Slot (max. 1× pro Person). */
+  linkSameWorkshop(workshopId: string, targetId: string | null) {
+    const w = this.project.workshops.find((x) => x.id === workshopId);
+    if (!w) return;
+    if (!targetId) {
+      w.groupId = null;
+      return;
+    }
+    const t = this.project.workshops.find((x) => x.id === targetId);
+    if (!t || t.id === w.id) return;
+    const gid = w.groupId ?? t.groupId ?? uid();
+    w.groupId = gid;
+    t.groupId = gid;
+  }
+
+  /** Kopplung: beide Workshops nur zusammen oder gar nicht (symmetrisch). */
+  pairWorkshops(workshopId: string, targetId: string | null) {
+    const w = this.project.workshops.find((x) => x.id === workshopId);
+    if (!w) return;
+    this.unpair(w);
+    if (!targetId) return;
+    const t = this.project.workshops.find((x) => x.id === targetId);
+    if (!t || t.id === w.id) return;
+    this.unpair(t);
+    w.pairedWith = t.id;
+    t.pairedWith = w.id;
+  }
+
+  private unpair(w: Workshop) {
+    if (!w.pairedWith) return;
+    const partner = this.project.workshops.find((x) => x.id === w.pairedWith);
+    if (partner && partner.pairedWith === w.id) partner.pairedWith = null;
+    w.pairedWith = null;
+  }
+
   private removeWorkshopsByIds(ids: Set<string>) {
+    // Koppel-Partner der gelöschten Workshops freigeben
+    for (const w of this.project.workshops) {
+      if (w.pairedWith && ids.has(w.pairedWith)) w.pairedWith = null;
+    }
     this.project.workshops = this.project.workshops.filter((w) => !ids.has(w.id));
     for (const personId of Object.keys(this.project.wishes)) {
       this.project.wishes[personId] = this.project.wishes[personId].filter(

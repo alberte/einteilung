@@ -15,6 +15,17 @@ export interface Workshop {
   slotId: string;
   min: number;
   max: number;
+  /**
+   * Instanzen-Gruppe: Workshops mit derselben groupId sind Instanzen desselben
+   * Workshops in (i. d. R.) verschiedenen Slots. Eine Person erhält davon
+   * höchstens eine Instanz.
+   */
+  groupId?: string | null;
+  /**
+   * Koppel-Partner (Workshop-Id): Gekoppelte Workshops werden von einer Person
+   * nur zusammen oder gar nicht besucht (x[a] = x[b] pro Person).
+   */
+  pairedWith?: string | null;
 }
 
 export interface Person {
@@ -109,9 +120,20 @@ export function normalizeProject(raw: unknown): Project {
           slotId: id(w.slotId, slots[0]?.id ?? ""),
           min: Math.max(0, Math.floor(Number(w.min) || 0)),
           max: Math.max(0, Math.floor(Number(w.max) || 0)),
+          groupId: typeof w.groupId === "string" && w.groupId.length > 0 ? w.groupId : null,
+          pairedWith:
+            typeof w.pairedWith === "string" && w.pairedWith.length > 0 ? w.pairedWith : null,
         }))
         .filter((w) => slotIds.has(w.slotId))
     : [];
+
+  // Koppel-Verweise säubern (self-referenzen / ins Leere laufende Verweise)
+  const workshopIds = new Set(workshops.map((w) => w.id));
+  for (const w of workshops) {
+    if (w.pairedWith === w.id || (w.pairedWith && !workshopIds.has(w.pairedWith))) {
+      w.pairedWith = null;
+    }
+  }
 
   const persons: Person[] = Array.isArray(data.persons)
     ? (data.persons as Record<string, unknown>[]).map((p, i) => ({
@@ -120,7 +142,6 @@ export function normalizeProject(raw: unknown): Project {
       }))
     : [];
 
-  const workshopIds = new Set(workshops.map((w) => w.id));
   const rawWishes =
     data.wishes && typeof data.wishes === "object" ? (data.wishes as Record<string, unknown>) : {};
   const wishes: Record<string, Wish[]> = {};
@@ -189,7 +210,27 @@ export function sampleProject(): Project {
   const journalismus = ws("Journalismus", b3, 2, 6);
   const nature = ws("Naturexkursion", b3, 2, 8);
   const codes = ws("Crashkurs Codes", b3, 0, 10);
-  p.workshops = [kochen, robotic, theater, malen, sport, musik, journalismus, nature, codes];
+  // Gleicher Workshop in zwei Slots (Instanzen-Gruppe): max. 1× pro Person
+  const kochenWdh = ws("Kochen (Wiederholung)", b3, 0, 4);
+  kochen.groupId = uid();
+  kochenWdh.groupId = kochen.groupId;
+  // Gekoppelter zweiteiliger Workshop: nur zusammen oder gar nicht
+  const robotikAufbau = ws("Robotik Aufbau", b2, 2, 6);
+  robotic.pairedWith = robotikAufbau.id;
+  robotikAufbau.pairedWith = robotic.id;
+  p.workshops = [
+    kochen,
+    robotic,
+    theater,
+    malen,
+    sport,
+    musik,
+    robotikAufbau,
+    journalismus,
+    nature,
+    codes,
+    kochenWdh,
+  ];
 
   const personNames = [
     "Anna",
@@ -213,7 +254,7 @@ export function sampleProject(): Project {
     ],
     [
       ["Robotik", 1],
-      ["Sportspiele", 2],
+      ["Robotik Aufbau", 2],
       ["Naturexkursion", 3],
     ],
     [
@@ -224,7 +265,7 @@ export function sampleProject(): Project {
     [
       ["Kochen", 1],
       ["Sportspiele", 2],
-      ["Journalismus", 3],
+      ["Kochen (Wiederholung)", 3],
     ],
     [
       ["Robotik", 1],

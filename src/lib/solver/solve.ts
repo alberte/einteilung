@@ -44,12 +44,15 @@ export function solve(input: SolveInput): SolveResult {
     if (elapsed >= timeoutMs * 0.9) {
       return { status: "timeout" };
     }
-    // Diagnose hat „lösbar“ gesagt — sollte nicht passieren.
+    // Diagnose hat „lösbar“ gesagt — sollte nicht passieren. Häufigster
+    // Grund in der Praxis: Koppel-Paare, die die aggregierten Prüfungen
+    // nicht abdecken.
     return {
       status: "infeasible",
       reasons: [
         "Keine Lösung gefunden, obwohl die Kapazitätsprüfungen bestanden haben. " +
-          "Bitte als Fehler melden (am besten mit dem gespeicherten Projekt-JSON).",
+          "Bitte Kopplungen („immer zusammen“-Workshops) und Verbindungen prüfen " +
+          "oder als Fehler melden (am besten mit dem gespeicherten Projekt-JSON).",
       ],
     };
   }
