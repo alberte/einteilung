@@ -1,6 +1,6 @@
 # Workshop-Planner („Einteilung“)
 
-Statische Webanwendung, mit der Veranstalter Workshop-Belegungen aus
+ Statische Webanwendung, mit der Veranstalter Workshop-Belegungen aus
 Teilnehmerwünschen berechnen: Jede Person wählt Wünsche in Rangfolge und
 bekommt **n Workshops** zugewiesen; jeder Workshop hat **Min- und
 Höchstbelegung** und läuft in einem von mehreren **Zeit-Slots**
