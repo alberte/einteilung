@@ -41,9 +41,15 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
    Priorität sortieren (Rang = Position, kein Tippen). Importformat: eine
    Zeile pro Person, eine Namens-Spalte und Wunsch-Spalten in Rangfolge
    (Wunsch 1 = Erstwunsch, Workshop-Namen wie angelegt,
-   Groß-/Kleinschreibung egal). Für Excel-Nutzer gibt es eine
-   XLSX-Vorlage mit Anleitung-, Ausfüll- und Referenzblatt (im
-   Import-Dialog und im Projekt-Tab).
+   Groß-/Kleinschreibung egal). Bei abweichenden Titeln bietet der Import
+   einen **Zuordnungs-Schritt**: Unbekannte Titel (mit Häufigkeit) werden
+   dem richtigen Workshop zugeordnet, mit Vorschlag bei Tippfehlern/
+   Varianten (Umlaute, Satzzeichen und Schreibfehler werden toleriert) und
+   Hinweisen zu Verbindungen — eine Zuordnung auf eine Durchführung einer
+   Instanzen-Gruppe gilt für alle, bei gekoppelten Paaren wird der Partner
+   automatisch mitvergeben. Nicht zugeordnete Titel verfallen mit Meldung.
+   Für Excel-Nutzer gibt es eine XLSX-Vorlage mit Anleitung-, Ausfüll- und
+   Referenzblatt (im Import-Dialog und im Projekt-Tab).
 3. **Konfiguration** — n (Workshops pro Person), Straf-Profil
    (linear „Effizient“ / quadratisch „Fair“), Zeitlimit.
 4. **Ergebnis** — Belegung berechnen: Statistiken, Workshop-Kacheln pro

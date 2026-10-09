@@ -90,6 +90,7 @@ export function validateProject(project: Project): Validation {
   // Personen-Wünsche
   let noWishPersons = 0;
   let lowWishPersons = 0;
+  let groupWishPersons = 0;
   for (const p of project.persons) {
     const wishes = project.wishes[p.id] ?? [];
     if (wishes.length === 0) {
@@ -103,6 +104,16 @@ export function validateProject(project: Project): Validation {
     );
     if (slotsOfWishes.size < project.config.n) {
       lowWishPersons += 1;
+    }
+    // Mehrere Wünsche auf Durchführungen desselben Workshops (Instanzen-Gruppe)
+    const groupsSeen = new Set<string>();
+    for (const wish of wishes) {
+      const g = workshopById.get(wish.workshopId)?.groupId;
+      if (g && groupsSeen.has(g)) {
+        groupWishPersons += 1;
+        break;
+      }
+      if (g) groupsSeen.add(g);
     }
     for (const wish of wishes) {
       if (!workshopIds.has(wish.workshopId)) {
@@ -121,6 +132,11 @@ export function validateProject(project: Project): Validation {
   if (lowWishPersons > 0) {
     warnings.push(
       `${lowWishPersons} Person(en) haben Wünsche in weniger als n = ${project.config.n} verschiedenen Slots — teils „kein Wunsch“-Zuweisungen wahrscheinlich.`,
+    );
+  }
+  if (groupWishPersons > 0) {
+    warnings.push(
+      `${groupWishPersons} Person(en) wünschen mehrere Durchführungen desselben verbundenen Workshops — davon zählt nur eine (die mit dem besten Rang).`,
     );
   }
 
