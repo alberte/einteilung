@@ -20,8 +20,14 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
    absteigend). Das Kopier-Symbol klont einen Workshop in einen
    anderen Slot (min/max werden übernommen). Die Workshopliste lässt
    sich per „Excel-Export“ als Datei `workshops.xlsx` ausgeben
-   (Workshop, Slot, min/max, Verbindungshinweise). Über das
-   Ketten-Symbol lassen sich Workshops verbinden:
+   (Workshop, Slot, min/max, Verbindungshinweise) — und per
+   „Excel-Import“ aus Excel/CSV wieder einlesen: neue Slots werden
+   automatisch angelegt, Workshops mit vorhandenem Namen werden
+   aktualisiert (Modus „ergänzen“) oder die komplette Liste wird
+   ersetzt. Die Vorlage (`workshops-vorlage.xlsx`, mit Anleitung)
+   enthält bei befülltem Projekt die aktuelle Liste — exportieren,
+   bearbeiten, wieder importieren. Über das Ketten-Symbol lassen sich
+   Workshops verbinden:
    - **Gleicher Workshop — weitere Durchführungen**: Pro Slot eine
      Instanz auswählen (bis zu einer Durchführung je Slot). Der
      Workshop „läuft mehrfach“, jede Person erhält ihn höchstens
