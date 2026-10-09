@@ -31,6 +31,8 @@ export function runSolve(input: SolveInput): Promise<SolveResult> {
       });
     };
 
-    worker.postMessage(input);
+    // Sicherheitsnetz: nie Reactivitäts-Proxies an den Worker schicken —
+    // postMessage nutzt structured clone, das Proxies nicht klonen kann.
+    worker.postMessage(JSON.parse(JSON.stringify(input)));
   });
 }
