@@ -9,6 +9,7 @@ import {
   participantXlsxTemplate,
   resultCsv,
   resultXlsx,
+  workshopListXlsx,
 } from "./export";
 import { emptyProject, normalizeProject, sampleProject } from "../model";
 import { solve, toSolveInput } from "../solver";
@@ -91,6 +92,30 @@ describe("XLSX-Teilnehmervorlage", () => {
     // Kopplungshinweis für „Robotik“ enthält den Partner
     const robotik = rows.find((r) => r["Workshop"] === "Robotik");
     expect(String(robotik?.["Hinweis"] ?? "")).toContain("Robotik Aufbau");
+  });
+});
+
+describe("XLSX-Workshopliste", () => {
+  it("exportiert alle Workshops mit Slot, min/max und Hinweisen", () => {
+    const project = sampleProject();
+    const wb = readWorkbook(workshopListXlsx(project));
+    expect(wb.SheetNames).toEqual(["Workshops"]);
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Workshops"], {
+      defval: "",
+    });
+    expect(rows.length).toBe(project.workshops.length);
+    expect(Object.keys(rows[0])).toEqual(["Workshop", "Slot", "min", "max", "Hinweis"]);
+    // Beispielzeile: Instanzen-Gruppe wird im Hinweis genannt
+    const kochen = rows.find((r) => r["Workshop"] === "Kochen");
+    expect(String(kochen?.["Hinweis"] ?? "")).toContain("Kochen (Wiederholung)");
+  });
+
+  it("leeres Projekt erzeugt nur die Kopfzeile", () => {
+    const wb = readWorkbook(workshopListXlsx(emptyProject()));
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Workshops"], {
+      defval: "",
+    });
+    expect(rows.length).toBe(0);
   });
 });
 

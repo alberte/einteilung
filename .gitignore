@@ -4,3 +4,7 @@ coverage
 *.local
 .DS_Store
 .vite
+
+# Vorlagen/Arbeitsdateien, die Nutzer im Projektverzeichnis oeffnen
+*.xlsx
+.~lock.*#

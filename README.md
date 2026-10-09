@@ -18,8 +18,10 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
    min/max je Slot eintragen. Die Workshopliste ist über die
    Spaltenköpfe sortierbar (Name, Slot, min, max — aufsteigend/
    absteigend). Das Kopier-Symbol klont einen Workshop in einen
-   anderen Slot (min/max werden übernommen). Über das Ketten-Symbol
-   lassen sich Workshops verbinden:
+   anderen Slot (min/max werden übernommen). Die Workshopliste lässt
+   sich per „Excel-Export“ als Datei `workshops.xlsx` ausgeben
+   (Workshop, Slot, min/max, Verbindungshinweise). Über das
+   Ketten-Symbol lassen sich Workshops verbinden:
    - **Gleicher Workshop — weitere Durchführungen**: Pro Slot eine
      Instanz auswählen (bis zu einer Durchführung je Slot). Der
      Workshop „läuft mehrfach“, jede Person erhält ihn höchstens

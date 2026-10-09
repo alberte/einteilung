@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app, workshopsInSlot } from "../state.svelte";
+  import { downloadFile, workshopListXlsx } from "../io/export";
 
   let newSlotName = $state("");
   let newWorkshop = $state({ name: "", slotId: "", min: 1, max: 10 });
@@ -37,6 +38,15 @@
 
   function slotMinSum(slotId: string): number {
     return workshopsInSlot(app.project, slotId).reduce((acc, w) => acc + w.min, 0);
+  }
+
+  function exportWorkshopList() {
+    if (app.project.workshops.length === 0) return;
+    downloadFile(
+      "workshops.xlsx",
+      workshopListXlsx(app.project),
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
   }
 
   // --- Verbindungen zwischen Workshops -------------------------------
@@ -190,8 +200,16 @@
 
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header">
-        <i class="bi bi-grid-3x3-gap me-2"></i>Workshops
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-grid-3x3-gap me-2"></i>Workshops</span>
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          title="Workshopliste als Excel-Datei exportieren"
+          disabled={app.project.workshops.length === 0}
+          onclick={exportWorkshopList}
+        >
+          <i class="bi bi-filetype-xlsx me-1"></i>Excel-Export
+        </button>
       </div>
       <div class="card-body">
         {#if app.project.slots.length === 0}

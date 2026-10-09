@@ -68,6 +68,42 @@ function workshopHint(project: Project, workshopId: string): string {
   return hints.join("; ");
 }
 
+function workshopListAoa(project: Project): (string | number)[][] {
+  const slotNameOf = (slotId: string) => project.slots.find((s) => s.id === slotId)?.name ?? "";
+  return [
+    ["Workshop", "Slot", "min", "max", "Hinweis"],
+    ...project.workshops.map((w) => [
+      w.name,
+      slotNameOf(w.slotId),
+      w.min,
+      w.max,
+      workshopHint(project, w.id),
+    ]),
+  ];
+}
+
+function aoaToSheet(
+  wb: XLSX.WorkBook,
+  aoa: (string | number)[][],
+  widths: number[],
+  name: string,
+): XLSX.WorkSheet {
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = widths.map((wch) => ({ wch }));
+  XLSX.utils.book_append_sheet(wb, ws, name);
+  return ws;
+}
+
+/**
+ * Workshopliste als XLSX (Name, Slot, min/max, Verbindungshinweise) —
+ * z. B. als Programm-Übersicht zum Austeilen.
+ */
+export function workshopListXlsx(project: Project): ArrayBuffer {
+  const wb = XLSX.utils.book_new();
+  aoaToSheet(wb, workshopListAoa(project), [26, 22, 6, 6, 50], "Workshops");
+  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+}
+
 /** Ergebnis als mehrblättrige XLSX-Datei. */
 export function resultXlsx(
   project: Project,
@@ -244,19 +280,7 @@ export function participantXlsxTemplate(project: Project): ArrayBuffer {
   XLSX.utils.book_append_sheet(wb, wsHelp, "Anleitung");
 
   // Blatt 3: Workshops (Referenz)
-  const slotNameOf = (slotId: string) => project.slots.find((s) => s.id === slotId)?.name ?? "";
-  const wsWorkshops = XLSX.utils.aoa_to_sheet([
-    ["Workshop", "Slot", "min", "max", "Hinweis"],
-    ...project.workshops.map((w) => [
-      w.name,
-      slotNameOf(w.slotId),
-      w.min,
-      w.max,
-      workshopHint(project, w.id),
-    ]),
-  ]);
-  wsWorkshops["!cols"] = [{ wch: 26 }, { wch: 22 }, { wch: 6 }, { wch: 6 }, { wch: 50 }];
-  XLSX.utils.book_append_sheet(wb, wsWorkshops, "Workshops");
+  aoaToSheet(wb, workshopListAoa(project), [26, 22, 6, 6, 50], "Workshops");
 
   return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
 }
