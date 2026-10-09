@@ -364,9 +364,10 @@ describe("solve — Verbindungen", () => {
     expect(aVisitors.every((a) => a.fromWish)).toBe(true);
   });
 
-  it("Kopplung: gekoppelter Partner wird mitgezogen, auch ohne Wunsch", () => {
+  it("Kopplung: Wunsch auf Teil 1 deckt Teil 2 ab (keine „kein Wunsch“-Zuweisung)", () => {
     // p1 wünscht a@1 (S1) und e@2 (S2). a ist mit b gekoppelt.
-    // a+b kostet 1 + 1e6, Alternative d+e kostet 1e6 + 2 -> optimal ist a+b.
+    // Der Wunsch auf a deckt b mit ab: a+b kostet 1 + 1, d+e kostet
+    // 1e6 + 2 -> optimal ist a+b, und b zählt als erfüllter Wunsch.
     const r = solve(
       mk({
         slots: ["S1", "S2"],
@@ -388,8 +389,35 @@ describe("solve — Verbindungen", () => {
     expect(r.status).toBe("optimal");
     if (r.status !== "optimal") return;
     expect(assignmentOf(r, "p1", "a")).toBeTruthy();
-    expect(assignmentOf(r, "p1", "b")).toBeTruthy();
+    const b = assignmentOf(r, "p1", "b");
+    expect(b).toBeTruthy();
+    expect(b!.fromWish).toBe(true);
+    expect(b!.rank).toBe(1);
     expect(r.assignments.some((a) => a.workshopId === "d")).toBe(false);
+    expect(r.stats.nonWish).toBe(0);
+  });
+
+  it("Kopplung: Wunsch auf Teil 2 deckt Teil 1 ab (symmetrisch)", () => {
+    // p1 wünscht nur b@1 (Teil 2) -> nimmt b und damit auch a, beides
+    // erfüllte Wünsche; die Alternative d+e wäre teurer.
+    const r = solve(
+      mk({
+        slots: ["S1", "S2"],
+        workshops: [
+          ["a", "S1", 0, 1, "b"],
+          ["b", "S2", 0, 1, "a"],
+          ["d", "S1", 0, 1],
+          ["e", "S2", 0, 1],
+        ],
+        wishes: { p1: [["b", 1]] },
+        n: 2,
+      }),
+    );
+    expect(r.status).toBe("optimal");
+    if (r.status !== "optimal") return;
+    expect(assignmentOf(r, "p1", "a")?.fromWish).toBe(true);
+    expect(assignmentOf(r, "p1", "b")?.fromWish).toBe(true);
+    expect(r.stats.nonWish).toBe(0);
   });
 
   it("Kopplung: bei n=1 kann ein gekoppeltes Paar niemandem zugeteilt werden", () => {

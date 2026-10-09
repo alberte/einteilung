@@ -261,7 +261,8 @@
                 </div>
                 <p class="small text-secondary mb-0 mt-2">
                   Reihenfolge per Pfeil = Priorität (1. = Erstwunsch). Bei verbundenen Workshops
-                  gilt der Wunsch für alle Durchführungen; Workshops im selben Slot konkurrieren.
+                  gilt der Wunsch für alle Durchführungen; bei gekoppelten Paaren deckt ein Wunsch
+                  auf einen Teil beide Teile ab. Workshops im selben Slot konkurrieren.
                 </p>
               </td>
             </tr>

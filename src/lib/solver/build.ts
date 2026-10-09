@@ -143,17 +143,25 @@ export function buildModel(
   };
 
   // Stufe A: Wunsch-Variablen.
-  // Ein Wunsch auf eine Instanz einer verbundenen Gruppe gilt für ALLE
-  // Durchführungen des Workshops (gleicher Rang) — es ist egal, welche
-  // Instanz die Person am Ende besucht.
+  // Ein Wunsch deckt ab:
+  //  - alle Instanzen einer verbundenen Gruppe (gleicher Workshop,
+  //    mehrere Durchführungen — gleicher Rang), und
+  //  - den Koppel-Partner (zweiteiliger Workshop: Wer Teil 1 wünscht,
+  //    meint beide Teile — der Partner zählt als erfüllter Wunsch und
+  //    NICHT als „kein Wunsch“-Zuweisung).
   // (Duplikate pro Person/Workshop: bester Rang)
   const bestRank = new Map<string, number>();
   for (const p of persons) {
     bestRank.clear();
     for (const wish of input.wishes[p.id] ?? []) {
-      if (!workshopById.has(wish.workshopId)) continue;
-      const members = groupMembersOf(wish.workshopId);
-      for (const memberId of members) {
+      const w = workshopById.get(wish.workshopId);
+      if (!w) continue;
+      const covered = new Set(groupMembersOf(wish.workshopId));
+      if (w.pairedWith) {
+        const partner = workshopById.get(w.pairedWith);
+        if (partner) covered.add(partner.id);
+      }
+      for (const memberId of covered) {
         const prev = bestRank.get(memberId);
         if (prev === undefined || wish.rank < prev) bestRank.set(memberId, wish.rank);
       }

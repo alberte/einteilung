@@ -95,6 +95,10 @@ src/
   (Σ pro Person+Gruppe ≤ 1, „gleicher Workshop“), Koppel-Paare
   (x[a] = x[b] pro Person, „immer zusammen“); Ziel: minimierte
   Rangstrafe (linear oder quadratisch, konfigurierbar).
+- Ein Wunsch deckt alle Durchführungen einer Instanzen-Gruppe **und**
+  den Koppel-Partner ab (gleicher Rang): Der mitgezogene zweite Teil
+  eines Paars zählt als erfüllter Wunsch, nicht als
+  „kein Wunsch“-Zuweisung.
 - **Zwei Stufen**: Zuerst nur Wunsch-Variablen — ist dieses Modell
   lösbar, ist die Lösung global optimal (Zuweisungen ohne Wunsch sind
   mit Kosten 10⁶ so teuer, dass sie nur bei Unvermeidbarkeit auftreten).
