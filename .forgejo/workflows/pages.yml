@@ -23,8 +23,16 @@ jobs:
         run: npm ci
       - name: Tests (Solver-Kern)
         run: npm test
-      - name: Build
-        run: npm run build
+      - name: Build (Asset-Pfade auf /<repo>/ setzen)
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          REPO_NAME="${REPO#*/}"
+          BASE="/"
+          if [ "$REPO_NAME" != "$GITHUB_ACTOR.codeberg.page" ]; then
+            BASE="/$REPO_NAME/"
+          fi
+          npx vite build --base="$BASE"
       - name: Auf pages-Branch veröffentlichen
         env:
           PAGES_TOKEN: ${{ secrets.PAGES_TOKEN }}

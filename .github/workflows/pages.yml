@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+# Baut die App und veröffentlicht sie über GitHub Pages.
+# Einmalige Einrichtung:
+#   1. Repo auf GitHub anlegen und main pushen
+#   2. Settings -> Pages -> Source: "GitHub Actions"
+# Danach liegt die App unter https://<user>.github.io/<repo>/.
+#
+# Guard: Forgejo/Codeberg liest .github/workflows ebenfalls — dieser
+# Workflow soll dort aber nicht laufen (dafür gibt es .forgejo/).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - name: Build (Asset-Pfade auf /<repo>/ setzen)
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          BASE="/"
+          if [ "$REPO_NAME" != "$GITHUB_REPOSITORY_OWNER.github.io" ]; then
+            BASE="/$REPO_NAME/"
+          fi
+          npx vite build --base="$BASE"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    if: ${{ github.server_url == 'https://github.com' }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

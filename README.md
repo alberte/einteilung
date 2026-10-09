@@ -168,6 +168,35 @@ tea login add   # Codeberg-Anmeldung im CLI (Projektplan: tea als gh-Pendant)
 Der Build ist bewusst hoster-agnostic (`dist/` ist statisch); identisch
 auf GitHub Pages oder Cloudflare deploybar (Fallback aus Risiko R5).
 
+## Deployment auf GitHub Pages (Alternative)
+
+Die Pipeline `.github/workflows/pages.yml` baut bei jedem Push auf `main`
+und veröffentlicht über die GitHub-Pages-Actions. Einmalige Einrichtung:
+
+```bash
+# Repo anlegen (per Web oder gh CLI):
+gh repo create <repo> --public --source . --push
+```
+
+1. In den Repo-Einstellungen: **Settings → Pages → Source: „GitHub Actions“**
+2. Fertig — die App liegt unter `https://<user>.github.io/<repo>/`.
+
+Details:
+
+- Der Workflow setzt beim Build `--base=/<repo>/`, damit die Asset-Pfade
+  unter dem Unterpfad stimmen. Bei einem User-Site-Repo
+  (`<user>.github.io`, Auslieferung unter `/`) entfällt das automatisch.
+- Der Workflow trägt einen Guard (`github.server_url == 'https://github.com'`),
+  damit er auf Forgejo/Codeberg-Instanzen nicht mitläuft (Forgejo liest
+  `.github/workflows` ebenfalls); dort ist die `.forgejo`-Pipeline zuständig.
+
+Manueller Deploy ohne Actions (z. B. für einen schnellen Test):
+
+```bash
+npx vite build --base=/<repo>/
+npx gh-pages -d dist   # einmalig npm install -D gh-pages
+```
+
 ## Datenschutz-DoD
 
 - Kein Netzwerk-Request mit Personendaten; einzig externe Requests sind
