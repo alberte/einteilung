@@ -1,6 +1,11 @@
 <script lang="ts">
   import { app } from "../state.svelte";
-  import { downloadFile, projectJson } from "../io/export";
+  import {
+    downloadFile,
+    emptyProjectTemplate,
+    participantCsvTemplate,
+    projectJson,
+  } from "../io/export";
 
   let fileInput: HTMLInputElement | null = $state(null);
   let message = $state<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -8,6 +13,14 @@
   function save() {
     const date = new Date().toISOString().slice(0, 10);
     downloadFile(`workshop-projekt-${date}.json`, projectJson(app.project), "application/json");
+  }
+
+  function downloadProjectTemplate() {
+    downloadFile("workshop-projekt-vorlage.json", emptyProjectTemplate(), "application/json");
+  }
+
+  function downloadCsvTemplate() {
+    downloadFile("teilnehmer-import-vorlage.csv", participantCsvTemplate(app.project), "text/csv");
   }
 
   async function loadFile(e: Event) {
@@ -54,7 +67,7 @@
 </script>
 
 <div class="row g-4">
-  <div class="col-lg-6">
+  <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header"><i class="bi bi-hdd me-2"></i>Projekt speichern &amp; laden</div>
       <div class="card-body">
@@ -111,7 +124,34 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-file-earmark-arrow-down me-2"></i>Vorlagen
+      </div>
+      <div class="card-body">
+        <p class="small text-secondary">
+          Leere Vorlagen zum Befüllen außerhalb der App — anschließend hier bzw. im Teilnehmer-Tab
+          laden:
+        </p>
+        <div class="d-grid gap-2">
+          <button class="btn btn-outline-primary" onclick={downloadCsvTemplate}>
+            <i class="bi bi-filetype-csv me-1"></i>Teilnehmer-Import (CSV)
+          </button>
+          <button class="btn btn-outline-primary" onclick={downloadProjectTemplate}>
+            <i class="bi bi-filetype-json me-1"></i>Leeres Projekt (JSON)
+          </button>
+        </div>
+        <p class="small text-secondary mb-0 mt-3">
+          Die CSV-Vorlage enthält eine Beispielzeile mit den aktuell angelegten Workshop-Namen
+          (Spalten: Name, Wunsch 1, Wunsch 2, …; Semikolon-getrennt). Workshop-Namen müssen exakt zu
+          „Slots &amp; Workshops“ passen.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
     <div class="card h-100 border-success">
       <div class="card-header"><i class="bi bi-shield-lock me-2"></i>Datenschutz</div>
       <div class="card-body small">

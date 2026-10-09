@@ -51,6 +51,29 @@ class AppState {
     this.removeWorkshopsByIds(new Set([id]));
   }
 
+  /** Klont einen Workshop in einen anderen Slot (gleiche min/max). */
+  cloneWorkshop(workshopId: string, targetSlotId: string, name: string, asSameGroup: boolean) {
+    const w = this.project.workshops.find((x) => x.id === workshopId);
+    const trimmed = name.trim();
+    if (!w || !trimmed) return;
+    if (!this.project.slots.some((s) => s.id === targetSlotId)) return;
+    const copy: Workshop = {
+      id: uid(),
+      name: trimmed,
+      slotId: targetSlotId,
+      min: w.min,
+      max: w.max,
+      groupId: null,
+      pairedWith: null,
+    };
+    this.project.workshops.push(copy);
+    if (asSameGroup) {
+      const gid = w.groupId ?? uid();
+      w.groupId = gid;
+      copy.groupId = gid;
+    }
+  }
+
   // --- Verbindungen zwischen Workshops -------------------------------
   /**
    * Instanzen-Gruppe: setzt die Durchführung des Workshops in einem bestimmten

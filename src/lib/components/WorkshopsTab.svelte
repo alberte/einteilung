@@ -70,6 +70,63 @@
   const otherSlots = $derived(
     linkWorkshop ? app.project.slots.filter((s) => s.id !== linkWorkshop!.slotId) : [],
   );
+
+  // --- Sortierung der Workshopliste ----------------------------------
+  type SortKey = "default" | "name" | "slot" | "min" | "max";
+  let sortKey = $state<SortKey>("default");
+  let sortAsc = $state(true);
+
+  function toggleSort(key: Exclude<SortKey, "default">) {
+    if (sortKey === key) {
+      sortAsc = !sortAsc;
+    } else {
+      sortKey = key;
+      sortAsc = true;
+    }
+  }
+
+  function sortIcon(key: Exclude<SortKey, "default">): string {
+    if (sortKey !== key) return "bi-arrow-down-up text-secondary";
+    return sortAsc ? "bi-caret-up-fill" : "bi-caret-down-fill";
+  }
+
+  const sortedWorkshops = $derived.by(() => {
+    const list = [...app.project.workshops];
+    const key = sortKey;
+    if (key === "default") return list;
+    const dir = sortAsc ? 1 : -1;
+    const slotOrder = new Map(app.project.slots.map((s, i) => [s.id, i]));
+    return list.sort((a, b) => {
+      let cmp: number;
+      if (key === "name") cmp = a.name.localeCompare(b.name, "de");
+      else if (key === "slot")
+        cmp = (slotOrder.get(a.slotId) ?? 0) - (slotOrder.get(b.slotId) ?? 0);
+      else cmp = a[key] - b[key];
+      return cmp * dir || a.name.localeCompare(b.name, "de");
+    });
+  });
+
+  // --- Workshop in anderen Slot klonen -------------------------------
+  let cloneId = $state<string | null>(null);
+  const cloneSource = $derived(app.project.workshops.find((w) => w.id === cloneId) ?? null);
+  let cloneTarget = $state("");
+  let cloneName = $state("");
+  let cloneAsGroup = $state(true);
+
+  function openClone(id: string) {
+    const w = app.project.workshops.find((x) => x.id === id);
+    if (!w) return;
+    cloneId = id;
+    cloneName = w.name;
+    cloneAsGroup = true;
+    cloneTarget = app.project.slots.find((s) => s.id !== w.slotId)?.id ?? "";
+  }
+
+  function applyClone() {
+    if (!cloneSource || !cloneTarget.trim()) return;
+    app.cloneWorkshop(cloneSource.id, cloneTarget, cloneName, cloneAsGroup);
+    cloneId = null;
+  }
 </script>
 
 <div class="row g-4">
@@ -199,16 +256,48 @@
               <table class="table table-sm align-middle">
                 <thead>
                   <tr>
-                    <th style="min-width: 12rem;">Workshop</th>
-                    <th style="min-width: 10rem;">Slot</th>
-                    <th style="width: 6rem;">min</th>
-                    <th style="width: 6rem;">max</th>
+                    <th style="min-width: 12rem;">
+                      <button
+                        class="btn btn-sm btn-link p-0 text-decoration-none text-body fw-semibold"
+                        onclick={() => toggleSort("name")}
+                        aria-label="Nach Name sortieren"
+                      >
+                        Workshop <i class="bi {sortIcon('name')}"></i>
+                      </button>
+                    </th>
+                    <th style="min-width: 10rem;">
+                      <button
+                        class="btn btn-sm btn-link p-0 text-decoration-none text-body fw-semibold"
+                        onclick={() => toggleSort("slot")}
+                        aria-label="Nach Slot sortieren"
+                      >
+                        Slot <i class="bi {sortIcon('slot')}"></i>
+                      </button>
+                    </th>
+                    <th style="width: 6rem;">
+                      <button
+                        class="btn btn-sm btn-link p-0 text-decoration-none text-body fw-semibold"
+                        onclick={() => toggleSort("min")}
+                        aria-label="Nach Mindestbelegung sortieren"
+                      >
+                        min <i class="bi {sortIcon('min')}"></i>
+                      </button>
+                    </th>
+                    <th style="width: 6rem;">
+                      <button
+                        class="btn btn-sm btn-link p-0 text-decoration-none text-body fw-semibold"
+                        onclick={() => toggleSort("max")}
+                        aria-label="Nach Höchstbelegung sortieren"
+                      >
+                        max <i class="bi {sortIcon('max')}"></i>
+                      </button>
+                    </th>
                     <th style="min-width: 9rem;">Verbindung</th>
-                    <th style="width: 4rem;"></th>
+                    <th style="width: 7rem;"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {#each app.project.workshops as w (w.id)}
+                  {#each sortedWorkshops as w (w.id)}
                     <tr class={w.min > w.max ? "table-danger" : ""}>
                       <td
                         ><input
@@ -275,13 +364,23 @@
                         </div>
                       </td>
                       <td>
-                        <button
-                          class="btn btn-sm btn-outline-danger"
-                          title="Workshop löschen"
-                          onclick={() => removeWorkshopConfirm(w.id, w.name)}
-                        >
-                          <i class="bi bi-trash"></i>
-                        </button>
+                        <div class="d-flex gap-1">
+                          <button
+                            class="btn btn-sm btn-outline-secondary"
+                            title="In anderen Slot klonen"
+                            aria-label="Workshop {w.name} in anderen Slot klonen"
+                            onclick={() => openClone(w.id)}
+                          >
+                            <i class="bi bi-copy"></i>
+                          </button>
+                          <button
+                            class="btn btn-sm btn-outline-danger"
+                            title="Workshop löschen"
+                            onclick={() => removeWorkshopConfirm(w.id, w.name)}
+                          >
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   {/each}
@@ -379,6 +478,79 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick={() => (linkWorkshopId = null)}>
             Fertig
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop show"></div>
+{/if}
+
+{#if cloneSource}
+  <div
+    class="modal d-block"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Workshop klonen"
+  >
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-copy me-2"></i>Workshop „{cloneSource.name}“ klonen
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Schließen"
+            onclick={() => (cloneId = null)}
+          ></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" for="clone-name">Name der neuen Durchführung</label>
+            <input id="clone-name" class="form-control" bind:value={cloneName} />
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="clone-slot">Ziel-Slot</label>
+            <select id="clone-slot" class="form-select" bind:value={cloneTarget}>
+              {#each app.project.slots as slot (slot.id)}
+                {#if slot.id !== cloneSource!.slotId}
+                  <option value={slot.id}>{slot.name}</option>
+                {/if}
+              {/each}
+            </select>
+          </div>
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="clone-as-group"
+              bind:checked={cloneAsGroup}
+            />
+            <label class="form-check-label" for="clone-as-group">
+              Als <strong>gleichen Workshop</strong> verbinden (eine Durchführung je Slot, jede Person
+              erhält ihn höchstens einmal)
+            </label>
+          </div>
+          <div class="form-text">
+            Die Kopie übernimmt min/max ({cloneSource.min}/{cloneSource.max}) und kann anschließend
+            im Verbinden-Dialog angepasst werden. Ohne Verbindung sollte der Name angepasst werden,
+            damit der Import eindeutig bleibt.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick={() => (cloneId = null)}>
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            disabled={!cloneName.trim() || !cloneTarget}
+            onclick={applyClone}
+          >
+            <i class="bi bi-copy me-1"></i>Klonen
           </button>
         </div>
       </div>

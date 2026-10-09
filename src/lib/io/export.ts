@@ -1,7 +1,7 @@
 // Export: Ergebnis-CSV und Projekt-JSON als Blob-Download (alles lokal).
 
 import Papa from "papaparse";
-import type { Project } from "../model";
+import { emptyProject, type Project } from "../model";
 import type { SolveResult } from "../solver/types";
 
 export function downloadFile(filename: string, content: string, mime: string): void {
@@ -44,4 +44,34 @@ export function projectJson(project: Project): string {
     null,
     2,
   );
+}
+
+/** Leere Projektdatei als ausfüllbare Vorlage. */
+export function emptyProjectTemplate(): string {
+  return JSON.stringify(emptyProject(), null, 2);
+}
+
+/**
+ * CSV-Vorlage für den Teilnehmer-Import. Die Beispielzeile enthält echte
+ * Workshop-Namen des aktuellen Projekts (möglichst aus verschiedenen Slots),
+ * damit die erwartete Schreibweise direkt sichtbar ist.
+ */
+export function participantCsvTemplate(project: Project): string {
+  const wishColumns = Math.max(5, project.config.n + 2);
+  const header = ["Name", ...Array.from({ length: wishColumns }, (_, i) => `Wunsch ${i + 1}`)];
+
+  const example: string[] = [];
+  for (const slot of project.slots) {
+    const w = project.workshops.find((x) => x.slotId === slot.id && !example.includes(x.name));
+    if (w) example.push(w.name);
+  }
+  for (const w of project.workshops) {
+    if (example.length >= wishColumns) break;
+    if (!example.includes(w.name)) example.push(w.name);
+  }
+  const row = ["Beispielperson", ...example.slice(0, wishColumns)];
+  while (row.length < header.length) row.push("");
+
+  // BOM, damit Excel/LibreOffice UTF-8 (Umlaute) korrekt erkennt
+  return "\uFEFF" + Papa.unparse([header, row], { delimiter: ";" });
 }

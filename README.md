@@ -15,8 +15,11 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
 ## Bedienung (Kurzführung)
 
 1. **Slots & Workshops** — Slots (Zeitblöcke) anlegen, Workshops mit
-   min/max je Slot eintragen. Über das Ketten-Symbol lassen sich
-   Workshops verbinden:
+   min/max je Slot eintragen. Die Workshopliste ist über die
+   Spaltenköpfe sortierbar (Name, Slot, min, max — aufsteigend/
+   absteigend). Das Kopier-Symbol klont einen Workshop in einen
+   anderen Slot (min/max werden übernommen). Über das Ketten-Symbol
+   lassen sich Workshops verbinden:
    - **Gleicher Workshop — weitere Durchführungen**: Pro Slot eine
      Instanz auswählen (bis zu einer Durchführung je Slot). Der
      Workshop „läuft mehrfach“, jede Person erhält ihn höchstens
@@ -35,8 +38,11 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
 4. **Ergebnis** — Belegung berechnen: Statistiken, Workshop-Kacheln pro
    Slot, Personenübersicht; Zuweisungen ohne erfüllten Wunsch rot;
    CSV-Export (Person × Workshop × Slot, `;`-getrennt).
-5. **Projekt** — JSON speichern/laden, Beispielprojekt, Zurücksetzen.
-   Autosave: jede Änderung landet automatisch im `localStorage`.
+5. **Projekt** — JSON speichern/laden, Beispielprojekt, Zurücksetzen,
+   leere Vorlagen zum Download (Teilnehmer-CSV mit den aktuellen
+   Workshop-Namen, leeres Projekt-JSON). Die CSV-Vorlage hängt auch im
+   Import-Dialog. Autosave: jede Änderung landet automatisch im
+   `localStorage`.
 
 Unlösbare Fälle melden konkrete Ursachen, z. B.
 „Slot ‚Block 1‘: Die Mindestbelegungen ergeben 24 Plätze, es gibt aber nur

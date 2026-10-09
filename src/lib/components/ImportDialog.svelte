@@ -1,6 +1,7 @@
 <script lang="ts">
   import { parseTable, type ParsedTable } from "../io/importFile";
   import { applyImport, guessMapping, type ImportSummary } from "../io/applyImport";
+  import { downloadFile, participantCsvTemplate } from "../io/export";
   import { app } from "../state.svelte";
 
   let {
@@ -116,6 +117,21 @@
               bind:this={fileInput}
               onchange={onFileChange}
             />
+            <div class="form-text">
+              Noch keine Datei?
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 align-baseline"
+                onclick={() =>
+                  downloadFile(
+                    "teilnehmer-import-vorlage.csv",
+                    participantCsvTemplate(app.project),
+                    "text/csv",
+                  )}
+              >
+                CSV-Vorlage mit den aktuellen Workshop-Namen herunterladen
+              </button>
+            </div>
           </div>
 
           {#if busy}
