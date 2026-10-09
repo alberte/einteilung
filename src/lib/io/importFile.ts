@@ -10,15 +10,17 @@ export interface ParsedTable {
   rows: Record<string, string>[];
   source: "csv" | "xlsx";
   sheetName?: string;
+  /** alle Blätter (nur XLSX) — für die Blatt-Auswahl im Import-Dialog */
+  sheetNames?: string[];
 }
 
-export async function parseTable(file: File): Promise<ParsedTable> {
+export async function parseTable(file: File, sheetName?: string): Promise<ParsedTable> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv") || name.endsWith(".txt") || file.type === "text/csv") {
     return parseCsv(file);
   }
   if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
-    return parseXlsx(file);
+    return parseXlsx(file, sheetName);
   }
   throw new Error(
     `Nicht unterstützter Dateityp „${file.name}“. Erlaubt sind .csv, .xlsx und .xls.`,
@@ -42,21 +44,24 @@ async function parseCsv(file: File): Promise<ParsedTable> {
   return { columns, rows, source: "csv" };
 }
 
-async function parseXlsx(file: File): Promise<ParsedTable> {
+async function parseXlsx(file: File, requestedSheet?: string): Promise<ParsedTable> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf);
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) {
+  if (wb.SheetNames.length === 0) {
     throw new Error("Die Tabelle enthält keine Arbeitsblätter.");
   }
+  const sheetName = requestedSheet ?? wb.SheetNames[0];
   const ws = wb.Sheets[sheetName];
+  if (!ws) {
+    throw new Error(`Das Arbeitsblatt „${sheetName}“ existiert nicht.`);
+  }
   const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
   if (raw.length === 0) {
-    throw new Error("Das erste Arbeitsblatt enthält keine Zeilen.");
+    throw new Error(`Das Arbeitsblatt „${sheetName}“ enthält keine Zeilen.`);
   }
   const columns = [...new Set(raw.flatMap((r) => Object.keys(r)))];
   const rows = raw.map((r) => normalizeRow(columns, r));
-  return { columns, rows, source: "xlsx", sheetName };
+  return { columns, rows, source: "xlsx", sheetName, sheetNames: wb.SheetNames };
 }
 
 function normalizeRow(columns: string[], row: Record<string, unknown>): Record<string, string> {

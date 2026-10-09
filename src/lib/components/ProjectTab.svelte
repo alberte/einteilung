@@ -4,6 +4,7 @@
     downloadFile,
     emptyProjectTemplate,
     participantCsvTemplate,
+    participantXlsxTemplate,
     projectJson,
   } from "../io/export";
 
@@ -21,6 +22,14 @@
 
   function downloadCsvTemplate() {
     downloadFile("teilnehmer-import-vorlage.csv", participantCsvTemplate(app.project), "text/csv");
+  }
+
+  function downloadXlsxTemplate() {
+    downloadFile(
+      "teilnehmer-import-vorlage.xlsx",
+      participantXlsxTemplate(app.project),
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
   }
 
   async function loadFile(e: Event) {
@@ -135,6 +144,9 @@
           laden:
         </p>
         <div class="d-grid gap-2">
+          <button class="btn btn-outline-primary" onclick={downloadXlsxTemplate}>
+            <i class="bi bi-filetype-xlsx me-1"></i>Teilnehmer-Import (Excel, mit Anleitung)
+          </button>
           <button class="btn btn-outline-primary" onclick={downloadCsvTemplate}>
             <i class="bi bi-filetype-csv me-1"></i>Teilnehmer-Import (CSV)
           </button>
@@ -143,9 +155,10 @@
           </button>
         </div>
         <p class="small text-secondary mb-0 mt-3">
-          Die CSV-Vorlage enthält eine Beispielzeile mit den aktuell angelegten Workshop-Namen
-          (Spalten: Name, Wunsch 1, Wunsch 2, …; Semikolon-getrennt). Workshop-Namen müssen exakt zu
-          „Slots &amp; Workshops“ passen.
+          Die Excel-Vorlage enthält ein Anleitungsblatt, ein Ausfüllblatt für die Wünsche
+          (Beispielzeile mit den aktuell angelegten Workshop-Namen) und ein Referenzblatt mit allen
+          Workshops. Die CSV-Vorlage entspricht dem Ausfüllblatt (Semikolon-getrennt).
+          Workshop-Namen müssen exakt zu „Slots &amp; Workshops“ passen.
         </p>
       </div>
     </div>

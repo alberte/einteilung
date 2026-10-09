@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from "../state.svelte";
-  import { downloadFile, resultCsv } from "../io/export";
+  import { downloadFile, resultCsv, resultXlsx } from "../io/export";
   import { validateProject } from "../validation";
   import { groupByPersonSlot, groupByWorkshop } from "../resultView";
 
@@ -21,6 +21,16 @@
   const maxRankCount = $derived(
     optimal ? Math.max(1, ...Object.values(optimal.stats.rankDistribution)) : 1,
   );
+
+  function exportXlsx() {
+    if (!optimal) return;
+    const date = new Date().toISOString().slice(0, 10);
+    downloadFile(
+      `workshop-belegung-${date}.xlsx`,
+      resultXlsx(app.project, optimal),
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+  }
 
   function exportCsv() {
     if (!optimal) return;
@@ -127,8 +137,11 @@
       </div>
     </div>
     <div class="d-flex flex-column gap-2">
-      <button class="btn btn-success" onclick={exportCsv}>
-        <i class="bi bi-filetype-csv me-1"></i>Ergebnis als CSV exportieren
+      <button class="btn btn-success" onclick={exportXlsx}>
+        <i class="bi bi-filetype-xlsx me-1"></i>Ergebnis als Excel exportieren
+      </button>
+      <button class="btn btn-outline-success btn-sm" onclick={exportCsv}>
+        <i class="bi bi-filetype-csv me-1"></i>als CSV
       </button>
       <button
         class="btn btn-outline-secondary btn-sm"

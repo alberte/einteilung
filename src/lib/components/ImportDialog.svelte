@@ -1,7 +1,7 @@
 <script lang="ts">
   import { parseTable, type ParsedTable } from "../io/importFile";
   import { applyImport, guessMapping, type ImportSummary } from "../io/applyImport";
-  import { downloadFile, participantCsvTemplate } from "../io/export";
+  import { downloadFile, participantCsvTemplate, participantXlsxTemplate } from "../io/export";
   import { app } from "../state.svelte";
 
   let {
@@ -22,19 +22,15 @@
   let error = $state<string | null>(null);
   let busy = $state(false);
   let summary = $state<ImportSummary | null>(null);
+  let currentFile = $state<File | null>(null);
 
   const MAX_WISHES = 12;
 
-  async function onFileChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    error = null;
-    summary = null;
-    table = null;
-    if (!file) return;
+  async function loadTable(file: File, sheet?: string) {
     busy = true;
+    error = null;
     try {
-      table = await parseTable(file);
+      table = await parseTable(file, sheet);
       mapping = guessMapping(table);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
@@ -42,6 +38,23 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function onFileChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    error = null;
+    summary = null;
+    table = null;
+    currentFile = file ?? null;
+    if (!file) return;
+    await loadTable(file);
+  }
+
+  async function switchSheet(sheet: string) {
+    if (!currentFile || !table || table.sheetName === sheet) return;
+    summary = null;
+    await loadTable(currentFile, sheet);
   }
 
   function setRole(column: string, role: string) {
@@ -108,7 +121,7 @@
           <p class="text-secondary">{@render columnsHint()}</p>
 
           <div class="mb-3">
-            <label class="form-label" for="import-file">Datei (.csv, .xlsx, .xls)</label>
+            <label class="form-label" for="import-file">Datei (.xlsx, .xls, .csv)</label>
             <input
               id="import-file"
               class="form-control"
@@ -118,7 +131,20 @@
               onchange={onFileChange}
             />
             <div class="form-text">
-              Noch keine Datei?
+              Noch keine Datei? Vorlagen herunterladen:
+              <button
+                type="button"
+                class="btn btn-link btn-sm p-0 align-baseline"
+                onclick={() =>
+                  downloadFile(
+                    "teilnehmer-import-vorlage.xlsx",
+                    participantXlsxTemplate(app.project),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  )}
+              >
+                Excel-Vorlage
+              </button>
+              (mit Anleitung und Workshop-Liste) oder
               <button
                 type="button"
                 class="btn btn-link btn-sm p-0 align-baseline"
@@ -129,10 +155,29 @@
                     "text/csv",
                   )}
               >
-                CSV-Vorlage mit den aktuellen Workshop-Namen herunterladen
+                CSV-Vorlage
               </button>
             </div>
           </div>
+
+          {#if table?.sheetNames && table.sheetNames.length > 1}
+            <div class="mb-3">
+              <label class="form-label" for="import-sheet">Arbeitsblatt</label>
+              <select
+                id="import-sheet"
+                class="form-select"
+                value={table.sheetName}
+                onchange={(e) => switchSheet((e.target as HTMLSelectElement).value)}
+              >
+                {#each table.sheetNames as sheet (sheet)}
+                  <option value={sheet}>{sheet}</option>
+                {/each}
+              </select>
+              <div class="form-text">
+                Mehrere Arbeitsblätter erkannt — hier auswählen, welches die Teilnehmer enthält.
+              </div>
+            </div>
+          {/if}
 
           {#if busy}
             <div class="alert alert-secondary d-flex align-items-center gap-2">

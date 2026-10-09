@@ -27,21 +27,26 @@ Umsetzung des Plans in `projektplan-workshop-planner-web-client-seitig.md`.
    - **Gekoppelter Partner** (immer zusammen): Beide Workshops werden
      von jeder Person nur zusammen oder gar nicht besucht — für
      zweiteilige Workshops über zwei Slots.
-2. **Teilnehmer & Wünsche** — CSV/XLSX importieren (Spalten-Mapping im
-   Dialog) oder Personen von Hand anlegen; Wünsche per Hoch/Runter-
-   Pfeilen in der Priorität sortieren (Rang = Position, kein Tippen).
-   Importformat: eine Zeile pro Person, eine Namens-Spalte und
-   Wunsch-Spalten in Rangfolge (Wunsch 1 = Erstwunsch, Workshop-Namen wie
-   angelegt, Groß-/Kleinschreibung egal).
+2. **Teilnehmer & Wünsche** — XLSX oder CSV importieren (Spalten-Mapping im
+   Dialog; bei mehrblättrigen XLSX-Dateien wird das Blatt ausgewählt) oder
+   Personen von Hand anlegen; Wünsche per Hoch/Runter-Pfeilen in der
+   Priorität sortieren (Rang = Position, kein Tippen). Importformat: eine
+   Zeile pro Person, eine Namens-Spalte und Wunsch-Spalten in Rangfolge
+   (Wunsch 1 = Erstwunsch, Workshop-Namen wie angelegt,
+   Groß-/Kleinschreibung egal). Für Excel-Nutzer gibt es eine
+   XLSX-Vorlage mit Anleitung-, Ausfüll- und Referenzblatt (im
+   Import-Dialog und im Projekt-Tab).
 3. **Konfiguration** — n (Workshops pro Person), Straf-Profil
    (linear „Effizient“ / quadratisch „Fair“), Zeitlimit.
 4. **Ergebnis** — Belegung berechnen: Statistiken, Workshop-Kacheln pro
    Slot, Personenübersicht; Zuweisungen ohne erfüllten Wunsch rot;
-   CSV-Export (Person × Workshop × Slot, `;`-getrennt).
+   Export als mehrblättrige Excel-Datei (Zuweisungen, Pro Person als
+   Slot-Matrix, Pro Workshop, Statistik) oder CSV
+   (`;`-getrennt).
 5. **Projekt** — JSON speichern/laden, Beispielprojekt, Zurücksetzen,
-   leere Vorlagen zum Download (Teilnehmer-CSV mit den aktuellen
-   Workshop-Namen, leeres Projekt-JSON). Die CSV-Vorlage hängt auch im
-   Import-Dialog. Autosave: jede Änderung landet automatisch im
+   leere Vorlagen zum Download (Teilnehmer-Import als Excel mit
+   Anleitung-, Ausfüll- und Referenzblatt oder als CSV; leeres
+   Projekt-JSON). Autosave: jede Änderung landet automatisch im
    `localStorage`.
 
 Unlösbare Fälle melden konkrete Ursachen, z. B.
