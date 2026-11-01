@@ -1,28 +1,355 @@
-// Bootstrap wird über Sass gebündelt, damit Anpassungen (Farben, Optionen)
-// ohne kompiliertes CSS möglich sind (Projektplan A3).
+// ─────────────────────────────────────────────────────────────────────
+// „Werkstatt" — Theme für den Workshop-Planner.
+// Inspiriert von kreativen Arbeitsräumen: Werkbank, Pinnwand, gemein-
+// sames Tüfteln. Warm, handwerklich, einladend.
+// Bootstrap bleibt Komponenten-Grundlage; das Erscheinungsbild
+// kommt komplett aus dieser Datei. Schriften lokal gebündelt.
+// ─────────────────────────────────────────────────────────────────────
+
+// Palette -------------------------------------------------------------
+$terrakotta: #c67c5c; // Primär: Buttons, Akzente, aktive Zustände
+$petrol: #2d5a5a; // Header, sekundäre Flächen, aktive Workflow-Schritte
+$sand: #e8dcc8; // Card-Header, Tabellenköpfe, Flächen 2. Ordnung
+$creme: #f5f0e8; // Seitenhintergrund
+$rost: #a0522d; // Hover, Fokus-Ring
+$tinte: #3d2b1f; // Haupttext (warmes Dunkelbraun)
+$grau: #8a7f72; // Sekundärtext
+$ok: #5a8a5a;
+$warn: #d4a03c;
+$gefahr: #b84a3a;
+$info: #5a7a8a;
+
+$papier-weiss: #fffdf9; // Card-Body (warmes Weiß)
+$sand-leicht: #f0e9dc; // Tabellen-Zebra, Flächen 3. Ordnung
+$haarlinie: #e0d5c5; // Haarlinien, Borders
+
+// Schriften -----------------------------------------------------------
+$display: "Fraunces", Georgia, serif;
+$schrift: "Archivo", system-ui, sans-serif;
+
+// Bootstrap-Variablen -------------------------------------------------
+$font-family-sans-serif: $schrift;
+$font-family-base: $schrift;
+$headings-font-family: $display;
+$headings-font-weight: 600;
+$headings-color: $tinte;
+
+$primary: $terrakotta;
+$secondary: $grau;
+$success: $ok;
+$info: $info;
+$warning: $warn;
+$danger: $gefahr;
+$light: $sand-leicht;
+$dark: $tinte;
+
+$body-bg: $creme;
+$body-color: $tinte;
+$text-secondary: $grau;
+
+$border-color: $haarlinie;
+$border-radius: 0.5rem;
+$border-radius-lg: 0.75rem;
+$border-radius-xl: 1rem;
+
+$link-color: $petrol;
+$link-hover-color: $rost;
+$link-decoration: underline;
+$link-decoration-hover: underline;
+
+$component-active-bg: $terrakotta;
+$focus-ring-width: 0.1875rem;
+$focus-ring-color: rgba($rost, 0.5);
+
+// Flächen
+$card-border-color: $haarlinie;
+$card-cap-bg: $sand;
+$card-bg: $papier-weiss;
+$modal-content-border-color: $haarlinie;
+$modal-content-bg: $papier-weiss;
+
+$table-border-color: $haarlinie;
+$table-striped-bg: rgba($sand, 0.35);
+$table-color: $tinte;
+$table-bg: transparent;
+
+$alert-border-width: 0;
+$btn-focus-box-shadow: 0 0 0 $focus-ring-width $focus-ring-color;
+$list-group-border-color: $haarlinie;
+$list-group-bg: $papier-weiss;
+$badge-border-radius: 0.375rem;
+$progress-bg: $sand-leicht;
+$progress-border-radius: 0.25rem;
+$form-control-border-color: $haarlinie;
+$form-control-bg: $papier-weiss;
+$input-border-color: $haarlinie;
+$input-focus-border-color: $rost;
+$input-focus-box-shadow: 0 0 0 0.1875rem rgba($rost, 0.35);
+
+$card-box-shadow: 0 2px 8px rgba($tinte, 0.06);
+$box-shadow-sm: 0 1px 3px rgba($tinte, 0.05);
+$box-shadow: 0 4px 16px rgba($tinte, 0.08);
+$box-shadow-lg: 0 8px 32px rgba($tinte, 0.12);
+
 @import "bootstrap/scss/bootstrap";
 
-body {
-  background-color: #f6f8fb;
+// Eigene Design-Variablen für die Schicht darunter
+:root {
+  --terrakotta: #{$terrakotta};
+  --petrol: #{$petrol};
+  --sand: #{$sand};
+  --creme: #{$creme};
+  --rost: #{$rost};
+  --tinte: #{$tinte};
+  --haarlinie: #{$haarlinie};
 }
 
-.nav-tabs .nav-link {
-  cursor: pointer;
+// Basis ---------------------------------------------------------------
+
+// Zahlen in Tabellen und Auswertungen: fester Zeichenabstand
+.table,
+.result-band {
+  font-variant-numeric: tabular-nums;
 }
 
 table td {
   vertical-align: middle;
 }
 
-// Zuweisungen ohne erfüllten Wunsch rot markieren (Projektplan, Abschnitt 6)
-.from-no-wish {
-  color: var(--bs-danger);
+// Kopfband: die Werkstatt-Tür ----------------------------------------
+
+.app-header {
+  background: $petrol;
+  color: $creme;
+  padding-block: 1rem 1.125rem;
+  border-bottom: 3px solid rgba($terrakotta, 0.6);
+}
+
+.app-header .brand {
+  font-family: $display;
+  font-weight: 700;
+  font-size: 1.625rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: $creme;
+}
+
+.app-header .brand small {
+  display: block;
+  font-family: $schrift;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: rgba($creme, 0.72);
+  letter-spacing: 0.01em;
+  margin-top: 0.125rem;
+}
+
+.app-header .privacy-note {
+  font-size: 0.8125rem;
+  color: rgba($creme, 0.78);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-left: 1px solid rgba($creme, 0.28);
+  padding-left: 0.9rem;
+}
+
+// Workflow-Leiste: Arbeitsstationen ----------------------------------
+
+.workflow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.375rem;
+  margin: 1.25rem 0 0;
+  padding-bottom: 0.25rem;
+  overflow-x: auto;
+}
+
+.workflow .step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 0;
+  background: rgba($sand, 0.5);
+  padding: 0.45rem 0.85rem 0.7rem;
+  color: $grau;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: $border-radius-lg $border-radius-lg 0 0;
+  transition:
+    color 120ms ease,
+    background 120ms ease;
+}
+
+.workflow .step:hover {
+  color: $tinte;
+  background: rgba($sand, 0.8);
+}
+
+.workflow .step .num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  font-size: 0.8125rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.workflow .step.active {
+  color: $creme;
+  background: $petrol;
+}
+
+.workflow .step.active .num {
+  background: $terrakotta;
+  border-color: $terrakotta;
+  color: $creme;
+}
+
+.workflow .step.utility {
+  margin-left: auto;
+  color: $grau;
+  background: transparent;
+}
+
+.workflow .step.utility:hover {
+  background: rgba($sand, 0.5);
+}
+
+.workflow .step.utility.active {
+  background: $terrakotta;
+  color: $creme;
+}
+
+.workflow .step.utility::before {
+  content: "";
+  align-self: center;
+  width: 1px;
+  height: 1.4rem;
+  background: $haarlinie;
+  margin-right: 0.35rem;
+}
+
+// Inhaltsfläche: die Werkbank ----------------------------------------
+
+.app-main {
+  background: $papier-weiss;
+  border: 1px solid $haarlinie;
+  border-top: 0;
+  border-bottom-left-radius: $border-radius-xl;
+  border-bottom-right-radius: $border-radius-xl;
+  box-shadow: 0 2px 8px rgba($tinte, 0.06);
+}
+
+// Überschriften im Inhalt
+.app-main :is(h1, h2, h3, h4, h5, h6) .bi {
+  color: $terrakotta;
+}
+
+// Cards: Schubladen ---------------------------------------------------
+
+.card {
+  border-radius: $border-radius-lg;
+  box-shadow: 0 2px 8px rgba($tinte, 0.06);
+}
+
+.card-header {
+  border-bottom-color: $haarlinie;
+  font-weight: 600;
+  color: $tinte;
+}
+
+// Badges: warme, erdige Töne -----------------------------------------
+
+.badge.text-bg-success {
+  background-color: rgba($ok, 0.16);
+  color: #3d6b3d;
+}
+
+.badge.text-bg-warning {
+  background-color: rgba($warn, 0.18);
+  color: #8a6b1f;
+}
+
+.badge.text-bg-danger {
+  background-color: rgba($gefahr, 0.12);
+  color: #8a3428;
+}
+
+.badge.text-bg-info {
+  background-color: rgba($info, 0.14);
+  color: #3d5a6b;
+}
+
+.badge.text-bg-primary {
+  background-color: rgba($terrakotta, 0.16);
+  color: #8a4a2d;
+}
+
+.badge.text-bg-secondary {
+  background-color: rgba($grau, 0.14);
+  color: #5a5248;
+}
+
+.badge.text-bg-light {
+  background-color: $sand-leicht;
+  color: $tinte;
+}
+
+// Zuweisungen ohne erfüllten Wunsch rot markieren
+.from-no-wish {
+  color: $gefahr;
+  font-weight: 600;
+}
+
+// Ergebnis-Band: die Tafel der Werkstatt ------------------------------
+
+.result-band {
+  background: $papier-weiss;
+  border: 1px solid $haarlinie;
+  border-radius: $border-radius-lg;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 2px 8px rgba($tinte, 0.06);
+}
+
+.result-band .figure {
+  font-family: $display;
+  font-weight: 700;
+  font-size: 2.75rem;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: $petrol;
+}
+
+.result-band .figure-label {
+  font-size: 0.8125rem;
+  color: $grau;
+}
+
+.result-band .meta-item {
+  min-width: 5.5rem;
+}
+
+.result-band .meta-item .value {
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.result-band .meta-item .label {
+  font-size: 0.75rem;
+  color: $grau;
 }
 
 // Kachel-Ansicht der Workshops im Ergebnis-Tab
 .workshop-card {
   min-width: 15rem;
+  border-radius: $border-radius-lg;
 }
 
 .slot-row {
@@ -32,9 +359,56 @@ table td {
 }
 
 .workshop-count-ok {
-  background-color: var(--bs-success-bg-subtle);
+  background-color: rgba($ok, 0.06);
 }
 
 .workshop-count-low {
-  background-color: var(--bs-warning-bg-subtle);
+  background-color: rgba($warn, 0.08);
+}
+
+// Solver-Overlay ------------------------------------------------------
+
+.solver-overlay {
+  background: rgba($tinte, 0.4);
+}
+
+.solver-overlay .card {
+  border-radius: $border-radius-xl;
+}
+
+// Tastatur-Fokus sichtbar halten (warmer Rost-Ring)
+:focus-visible {
+  outline: 2px solid rgba($rost, 0.85);
+  outline-offset: 1px;
+}
+
+// Bewegung reduzieren: Übergänge abschalten
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+// Schmale Ansicht ----------------------------------------------------
+@media (max-width: 575.98px) {
+  .app-header .brand {
+    font-size: 1.375rem;
+  }
+
+  .app-header .privacy-note {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .workflow .step {
+    font-size: 0.875rem;
+    padding-inline: 0.6rem;
+  }
+
+  .result-band .figure {
+    font-size: 2.25rem;
+  }
 }

@@ -1,11 +1,10 @@
 // Tests für den Workshop-Import (CSV/XLSX-Tabellen).
 
 import { describe, expect, it } from "vitest";
-import * as XLSX from "xlsx";
-import { applyWorkshopImport, parseWorkshopTable } from "./importWorkshops";
-import type { ParsedTable } from "./importFile";
+import { applyWorkshopImport, isWorkshopTable, parseWorkshopTable } from "./importWorkshops";
+import { mergeTables, parseSheets, type ParsedTable } from "./importFile";
 import { emptyProject, normalizeProject, sampleProject } from "../model";
-import { workshopXlsxTemplate } from "./export";
+import { participantXlsxTemplate } from "./export";
 
 function mkTable(rows: Record<string, string>[], columns?: string[]): ParsedTable {
   return {
@@ -37,6 +36,17 @@ describe("parseWorkshopTable", () => {
       ]),
     );
     expect(rows).toEqual([{ name: "Kochen", slot: "Block 1", min: 0, max: 0 }]);
+  });
+});
+
+describe("isWorkshopTable", () => {
+  it("erkennt das Workshop-Format und lehnt Anleitungsblätter ab", () => {
+    expect(isWorkshopTable(mkTable([{ Workshop: "Kochen", Slot: "Block 1" }]))).toBe(true);
+    expect(isWorkshopTable(mkTable([{ Name: "Kochen", Slot: "Block 1" }]))).toBe(true);
+    expect(isWorkshopTable(mkTable([{ "Anleitung — Workshop-Programm eintragen": "Text" }]))).toBe(
+      false,
+    );
+    expect(isWorkshopTable(mkTable([{ Workshop: "Kochen" }]))).toBe(false);
   });
 });
 
@@ -113,38 +123,33 @@ describe("applyWorkshopImport — ersetzen", () => {
   });
 });
 
-describe("Roundtrip: Vorlage exportieren und wieder importieren", () => {
-  it("workshops-vorlage.xlsx eines befüllten Projekts ist idempotent importierbar", () => {
+describe("Roundtrip: Import-Vorlage exportieren und wieder importieren", () => {
+  it("das Workshopblatt der Vorlage eines befüllten Projekts ist idempotent importierbar", async () => {
     const project = sampleProject();
-    const wb = XLSX.read(workshopXlsxTemplate(project), { type: "buffer" });
-    expect(wb.SheetNames).toEqual(["Workshops", "Anleitung"]);
-
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Workshops"], {
-      defval: "",
-    });
-    const columns = Object.keys(json[0]);
-    const table: ParsedTable = {
-      columns,
-      rows: json.map((r) => Object.fromEntries(columns.map((c) => [c, String(r[c] ?? "").trim()]))),
-      source: "xlsx",
-      sheetName: "Workshops",
-    };
+    const file = new File([participantXlsxTemplate(project)], "import-vorlage.xlsx");
+    const sheets = await parseSheets(file);
+    expect(sheets.map((s) => s.sheetName)).toEqual([
+      "Wünsche",
+      "Workshops",
+      "Konfiguration",
+      "Anleitung",
+    ]);
+    const wsSheets = sheets.filter((s) => s.rows.length > 0 && isWorkshopTable(s));
+    expect(wsSheets.map((s) => s.sheetName)).toEqual(["Workshops"]);
 
     const before = project.workshops.map((w) => [w.name, w.min, w.max]);
-    const summary = applyWorkshopImport(project, table, "append");
+    const summary = applyWorkshopImport(project, mergeTables(wsSheets), "append");
     expect(summary.workshopsCreated).toBe(0);
     expect(summary.workshopsUpdated).toBe(before.length);
     expect(summary.skipped).toEqual([]);
     expect(project.workshops.map((w) => [w.name, w.min, w.max])).toEqual(before);
   });
 
-  it("Vorlage eines leeren Projekts enthält Beispielzeilen", () => {
-    const wb = XLSX.read(workshopXlsxTemplate(emptyProject()), { type: "buffer" });
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Workshops"], {
-      defval: "",
-    });
-    expect(json.length).toBeGreaterThan(0);
-    expect(String(json[0]["Workshop"])).toBe("Kochen");
+  it("Vorlage eines leeren Projekts enthält Beispielzeilen im Workshopblatt", async () => {
+    const file = new File([participantXlsxTemplate(emptyProject())], "import-vorlage.xlsx");
+    const sheets = await parseSheets(file);
+    const ws = sheets.find((s) => s.rows.length > 0 && isWorkshopTable(s));
+    expect(ws?.rows[0]?.["Workshop"]).toBe("Kochen");
   });
 
   it("Vorlage bleibt ein ladbares Projekt, wenn sie als JSON missverstanden wird", () => {

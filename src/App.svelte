@@ -5,13 +5,23 @@
   import ConfigTab from "./lib/components/ConfigTab.svelte";
   import ResultsTab from "./lib/components/ResultsTab.svelte";
   import ProjectTab from "./lib/components/ProjectTab.svelte";
+  import ImportDialog from "./lib/components/ImportDialog.svelte";
+  import type { CentralImportSummary } from "./lib/io/applyImport";
+
+  let showImport = $state(false);
+  let lastImport = $state<CentralImportSummary | null>(null);
+
+  const importHasWarnings = $derived(
+    (lastImport?.participantImport?.unmatchedWorkshops.length ?? 0) > 0 ||
+      (lastImport?.workshopImport?.skipped.length ?? 0) > 0 ||
+      (lastImport?.configImport?.skipped.length ?? 0) > 0,
+  );
 
   const tabs = [
-    { id: "workshops", label: "Slots & Workshops", icon: "bi-grid-3x3-gap" },
-    { id: "participants", label: "Teilnehmer & Wünsche", icon: "bi-people" },
-    { id: "config", label: "Konfiguration", icon: "bi-sliders" },
-    { id: "result", label: "Ergebnis", icon: "bi-clipboard-data" },
-    { id: "project", label: "Projekt", icon: "bi-hdd" },
+    { id: "workshops", label: "Slots & Workshops" },
+    { id: "participants", label: "Teilnehmer & Wünsche" },
+    { id: "config", label: "Konfiguration" },
+    { id: "result", label: "Ergebnis" },
   ] as const;
 
   // localStorage-Autosave (Projektplan A5): schreibt bei jeder Änderung ins
@@ -28,33 +38,105 @@
   });
 </script>
 
-<nav class="navbar navbar-dark bg-primary sticky-top">
-  <div class="container-xl">
-    <span class="navbar-brand fw-semibold">
-      <i class="bi bi-grid-3x3-gap me-2"></i>Workshop-Planner
+<header class="app-header sticky-top">
+  <div class="container-xl d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="brand">
+      Einteilung
+      <small>Workshop-Belegung aus Teilnehmerwünschen</small>
     </span>
-    <span class="badge text-bg-light d-none d-md-inline-flex align-items-center gap-1">
-      <i class="bi bi-shield-lock"></i>
-      Alle Daten bleiben im Browser — kein Upload, kein Backend
+    <span class="d-flex align-items-center gap-3">
+      <span class="privacy-note d-none d-md-inline-flex">
+        <i class="bi bi-shield-lock"></i>
+        Alle Daten bleiben im Browser — kein Upload, kein Backend
+      </span>
+      <button
+        class="btn btn-sm btn-outline-light text-nowrap"
+        onclick={() => {
+          lastImport = null;
+          showImport = true;
+        }}
+      >
+        <i class="bi bi-file-import me-1"></i>Import
+      </button>
     </span>
   </div>
-</nav>
+</header>
 
 <div class="container-xl">
-  <ul class="nav nav-tabs pt-2">
-    {#each tabs as tab (tab.id)}
-      <li class="nav-item">
-        <button
-          class="nav-link {app.activeTab === tab.id ? 'active' : ''}"
-          onclick={() => (app.activeTab = tab.id)}
-        >
-          <i class="bi {tab.icon} me-1"></i>{tab.label}
-        </button>
-      </li>
+  <nav class="workflow" aria-label="Arbeitsschritte">
+    {#each tabs as tab, i (tab.id)}
+      <button
+        class="step {app.activeTab === tab.id ? 'active' : ''}"
+        onclick={() => (app.activeTab = tab.id)}
+        aria-current={app.activeTab === tab.id ? "page" : undefined}
+      >
+        <span class="num">{i + 1}</span>{tab.label}
+      </button>
     {/each}
-  </ul>
+    <button
+      class="step utility {app.activeTab === 'project' ? 'active' : ''}"
+      onclick={() => (app.activeTab = "project")}
+      aria-current={app.activeTab === "project" ? "page" : undefined}
+    >
+      <i class="bi bi-hdd me-1"></i>Projekt
+    </button>
+  </nav>
 
-  <main class="bg-white border border-top-0 p-3 p-lg-4 mb-4 shadow-sm rounded-bottom">
+  {#if lastImport}
+    <div
+      class="alert {importHasWarnings
+        ? 'alert-warning'
+        : 'alert-success'} alert-dismissible mt-3 mb-0 py-2 small"
+    >
+      {#if lastImport.configImport}
+        <div>
+          <strong>Konfiguration:</strong>
+          {#if lastImport.configImport.applied.length > 0}
+            {lastImport.configImport.applied.map((a) => `${a.key} = ${a.value}`).join(", ")}
+          {:else}
+            keine gültigen Einstellungen gefunden
+          {/if}
+          {#if lastImport.configImport.skipped.length}
+            — übersprungen: {lastImport.configImport.skipped.join("; ")}
+          {/if}
+        </div>
+      {/if}
+      {#if lastImport.workshopImport}
+        <div>
+          <strong>Workshops:</strong>
+          <strong>{lastImport.workshopImport.workshopsCreated}</strong> angelegt,
+          <strong>{lastImport.workshopImport.workshopsUpdated}</strong> aktualisiert,
+          <strong>{lastImport.workshopImport.slotsCreated}</strong> Slots angelegt
+          {#if lastImport.workshopImport.skipped.length}
+            — übersprungen: {lastImport.workshopImport.skipped.join("; ")}
+          {/if}
+        </div>
+      {/if}
+      {#if lastImport.participantImport}
+        <div>
+          <strong>Teilnehmer:</strong>
+          <strong>{lastImport.participantImport.personsAdded}</strong> importiert,
+          <strong>{lastImport.participantImport.wishesAdded}</strong> Wünsche zugeordnet
+          {lastImport.participantImport.skippedRows
+            ? `, ${lastImport.participantImport.skippedRows} Zeile(n) ohne Namen übersprungen`
+            : ""}
+          ({lastImport.mode === "replace" ? "ersetzt" : "ergänzt"}).
+          {#if lastImport.participantImport.unmatchedWorkshops.length}
+            Nicht zugeordnet (Wünsche verfallen):
+            <strong>{lastImport.participantImport.unmatchedWorkshops.join(", ")}</strong>
+          {/if}
+        </div>
+      {/if}
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Schließen"
+        onclick={() => (lastImport = null)}
+      ></button>
+    </div>
+  {/if}
+
+  <main class="app-main p-3 p-lg-4 mb-4">
     {#if app.activeTab === "workshops"}
       <WorkshopsTab />
     {:else if app.activeTab === "participants"}
@@ -69,10 +151,12 @@
   </main>
 </div>
 
+<ImportDialog bind:open={showImport} onDone={(s) => (lastImport = s)} />
+
 {#if app.solving}
   <div
-    class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-    style="background: rgba(33,37,41,.35); z-index: 2000;"
+    class="solver-overlay position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+    style="z-index: 2000;"
   >
     <div class="card shadow-lg">
       <div class="card-body d-flex align-items-center gap-3">

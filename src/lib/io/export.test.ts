@@ -63,13 +63,14 @@ describe("Vorlagen", () => {
   });
 });
 
-describe("XLSX-Teilnehmervorlage", () => {
-  it("hat Blätter Wünsche (zuerst, import-fähig), Anleitung, Workshops", () => {
+describe("XLSX-Importvorlage", () => {
+  it("hat Blätter Wünsche (zuerst, import-fähig), Workshops, Konfiguration, Anleitung", () => {
     const project = sampleProject();
     const wb = readWorkbook(participantXlsxTemplate(project));
     expect(wb.SheetNames[0]).toBe("Wünsche");
     expect(wb.SheetNames).toContain("Anleitung");
     expect(wb.SheetNames).toContain("Workshops");
+    expect(wb.SheetNames).toContain("Konfiguration");
 
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Wünsche"], {
       defval: "",
@@ -92,6 +93,20 @@ describe("XLSX-Teilnehmervorlage", () => {
     // Kopplungshinweis für „Robotik“ enthält den Partner
     const robotik = rows.find((r) => r["Workshop"] === "Robotik");
     expect(String(robotik?.["Hinweis"] ?? "")).toContain("Robotik Aufbau");
+  });
+
+  it("enthält im Blatt „Konfiguration“ die aktuellen Werte des Projekts", () => {
+    const project = sampleProject();
+    project.config = { n: 4, penaltyProfile: "fair", timeLimitSec: 120 };
+    const wb = readWorkbook(participantXlsxTemplate(project));
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets["Konfiguration"], {
+      defval: "",
+    });
+    expect(Object.keys(rows[0])).toEqual(["Einstellung", "Wert", "Hinweis"]);
+    const byKey = Object.fromEntries(rows.map((r) => [String(r["Einstellung"]), r["Wert"]]));
+    expect(byKey["Workshops pro Person (n)"]).toBe(4);
+    expect(byKey["Strafprofil"]).toBe("fair");
+    expect(byKey["Solver-Zeitlimit (Sekunden)"]).toBe(120);
   });
 });
 

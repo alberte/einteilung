@@ -1,11 +1,6 @@
 <script lang="ts">
   import { app, workshopsInSlot } from "../state.svelte";
   import { downloadFile, workshopListXlsx } from "../io/export";
-  import type { WorkshopImportSummary } from "../io/importWorkshops";
-  import WorkshopsImportDialog from "./WorkshopsImportDialog.svelte";
-
-  let showWorkshopImport = $state(false);
-  let importSummary = $state<WorkshopImportSummary | null>(null);
 
   let newSlotName = $state("");
   let newWorkshop = $state({ name: "", slotId: "", min: 1, max: 10 });
@@ -209,16 +204,6 @@
         <span><i class="bi bi-grid-3x3-gap me-2"></i>Workshops</span>
         <span class="d-flex gap-2">
           <button
-            class="btn btn-sm btn-outline-primary"
-            title="Workshops aus Excel/CSV importieren"
-            onclick={() => {
-              importSummary = null;
-              showWorkshopImport = true;
-            }}
-          >
-            <i class="bi bi-file-import me-1"></i>Excel-Import
-          </button>
-          <button
             class="btn btn-sm btn-outline-secondary"
             title="Workshopliste als Excel-Datei exportieren"
             disabled={app.project.workshops.length === 0}
@@ -229,35 +214,10 @@
         </span>
       </div>
       <div class="card-body">
-        {#if importSummary}
-          <div
-            class="alert {importSummary.skipped.length
-              ? 'alert-warning'
-              : 'alert-success'} alert-dismissible py-2 small"
-          >
-            <div>
-              Import: <strong>{importSummary.workshopsCreated}</strong> Workshops angelegt,
-              <strong>{importSummary.workshopsUpdated}</strong> aktualisiert,
-              <strong>{importSummary.slotsCreated}</strong> Slots angelegt ({importSummary.mode ===
-              "replace"
-                ? "ersetzt"
-                : "ergänzt"}).
-              {#if importSummary.skipped.length}
-                Übersprungen: {importSummary.skipped.join("; ")}.
-              {/if}
-            </div>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="Schließen"
-              onclick={() => (importSummary = null)}
-            ></button>
-          </div>
-        {/if}
         {#if app.project.slots.length === 0}
           <div class="alert alert-info mb-0">
-            Noch keine Slots. entweder links anlegen oder rechts über „Excel-Import“ eine
-            Workshopliste mit neuen Slots einlesen.
+            Noch keine Slots. Entweder links anlegen oder über den Import-Button im Kopf der Seite
+            eine Datei mit Workshop-Blatt (Workshop, Slot, min, max) einlesen.
           </div>
         {:else}
           <form
@@ -621,5 +581,3 @@
   </div>
   <div class="modal-backdrop show"></div>
 {/if}
-
-<WorkshopsImportDialog bind:open={showWorkshopImport} onDone={(s) => (importSummary = s)} />

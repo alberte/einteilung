@@ -1,14 +1,10 @@
 <script lang="ts">
   import { app } from "../state.svelte";
-  import ImportDialog from "./ImportDialog.svelte";
   import { validateProject } from "../validation";
-  import type { ImportSummary } from "../io/applyImport";
 
-  let showImport = $state(false);
   let newPersonName = $state("");
   let search = $state("");
   let expandedId = $state<string | null>(null);
-  let lastSummary = $state<ImportSummary | null>(null);
 
   const validation = $derived(validateProject(app.project));
 
@@ -56,15 +52,6 @@
 </script>
 
 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-  <button
-    class="btn btn-primary"
-    onclick={() => {
-      lastSummary = null;
-      showImport = true;
-    }}
-  >
-    <i class="bi bi-file-import me-1"></i>CSV / XLSX importieren
-  </button>
   <form
     class="d-flex gap-2"
     onsubmit={(e) => {
@@ -96,33 +83,6 @@
     aria-label="Teilnehmer suchen"
   />
 </div>
-
-{#if lastSummary}
-  <div
-    class="alert {lastSummary.unmatchedWorkshops.length
-      ? 'alert-warning'
-      : 'alert-success'} alert-dismissible"
-  >
-    <div>
-      Import: <strong>{lastSummary.personsAdded}</strong> Teilnehmer,
-      <strong>{lastSummary.wishesAdded}</strong> Wünsche
-      {lastSummary.skippedRows ? `, ${lastSummary.skippedRows} Zeilen ohne Namen übersprungen` : ""}
-      ({lastSummary.mode === "replace" ? "ersetzt" : "angehängt"}).
-    </div>
-    {#if lastSummary.unmatchedWorkshops.length}
-      <div>
-        Unbekannte Workshop-Namen (verworfen):
-        <strong>{lastSummary.unmatchedWorkshops.join(", ")}</strong>
-      </div>
-    {/if}
-    <button
-      type="button"
-      class="btn-close"
-      aria-label="Schließen"
-      onclick={() => (lastSummary = null)}
-    ></button>
-  </div>
-{/if}
 
 {#if validation.warnings.length}
   <div class="alert alert-warning py-2 small">
@@ -272,5 +232,3 @@
     </table>
   </div>
 {/if}
-
-<ImportDialog bind:open={showImport} onDone={(s) => (lastSummary = s)} />

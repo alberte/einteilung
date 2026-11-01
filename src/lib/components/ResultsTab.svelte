@@ -99,40 +99,36 @@
   </div>
 {:else}
   {@const stats = result.stats}
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-    <div class="d-flex flex-wrap gap-3">
-      <div class="card">
-        <div class="card-body py-2 px-3">
-          <div class="text-secondary small">Zuweisungen</div>
-          <div class="fs-4">{stats.totalAssignments}</div>
-        </div>
+  {@const wishShare =
+    stats.totalAssignments > 0
+      ? Math.round((stats.fromWishes / stats.totalAssignments) * 100)
+      : null}
+  <div class="result-band d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div class="d-flex flex-wrap align-items-center gap-3 gap-lg-4">
+      <div>
+        <div class="figure">{wishShare === null ? "–" : wishShare + " %"}</div>
+        <div class="figure-label">der Zuweisungen aus Wünschen</div>
       </div>
-      <div class="card">
-        <div class="card-body py-2 px-3">
-          <div class="text-secondary small">aus Wünschen</div>
-          <div class="fs-4 text-success">{stats.fromWishes}</div>
+      <div class="d-flex flex-wrap gap-3 ps-lg-4 border-start">
+        <div class="meta-item">
+          <div class="value">{stats.totalAssignments}</div>
+          <div class="label">Zuweisungen</div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-body py-2 px-3">
-          <div class="text-secondary small">
-            ohne Wunsch <i class="bi bi-info-circle" title="Rot markierte Zuweisungen"></i>
-          </div>
-          <div class="fs-4 {stats.nonWish ? 'text-danger' : ''}">{stats.nonWish}</div>
+        <div class="meta-item">
+          <div class="value text-success">{stats.fromWishes}</div>
+          <div class="label">aus Wünschen</div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-body py-2 px-3">
-          <div class="text-secondary small">Ø Wunsch-Rang</div>
-          <div class="fs-4">
-            {stats.avgWishRank === null ? "–" : stats.avgWishRank.toFixed(2)}
-          </div>
+        <div class="meta-item">
+          <div class="value {stats.nonWish ? 'text-danger' : ''}">{stats.nonWish}</div>
+          <div class="label">ohne Wunsch</div>
         </div>
-      </div>
-      <div class="card">
-        <div class="card-body py-2 px-3">
-          <div class="text-secondary small">Rechenzeit</div>
-          <div class="fs-4">{(stats.solveMs / 1000).toFixed(1)} s</div>
+        <div class="meta-item">
+          <div class="value">{stats.avgWishRank === null ? "–" : stats.avgWishRank.toFixed(2)}</div>
+          <div class="label">Ø Wunsch-Rang</div>
+        </div>
+        <div class="meta-item">
+          <div class="value">{(stats.solveMs / 1000).toFixed(1)} s</div>
+          <div class="label">Rechenzeit</div>
         </div>
       </div>
     </div>

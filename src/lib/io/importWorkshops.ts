@@ -23,6 +23,12 @@ export interface WorkshopImportSummary {
   skipped: string[];
 }
 
+/** Erkennt ein Arbeitsblatt am Workshop-Import-Format („Workshop“- und „Slot“-Spalte). */
+export function isWorkshopTable(table: ParsedTable): boolean {
+  const col = (re: RegExp) => table.columns.find((c) => re.test(c.trim()));
+  return Boolean(col(/^(workshop|name)$/i) && col(/^slot/i));
+}
+
 /**
  * Prüft die Spalten und liefert die Workshop-Zeilen.
  * Wirft mit klarem Text, wenn „Workshop“ oder „Slot“ fehlen.

@@ -2,7 +2,11 @@
 
 import type { Project, Wish } from "../model";
 import { uid } from "../model";
-import type { ParsedTable } from "./importFile";
+import { normalizeTitle, type ParsedTable } from "./importFile";
+import type { WorkshopImportSummary } from "./importWorkshops";
+import type { ConfigImportSummary } from "./importConfig";
+
+export { normalizeTitle } from "./importFile";
 
 export interface ImportMapping {
   nameColumn: string | null;
@@ -22,15 +26,42 @@ export interface ImportSummary {
   mode: "replace" | "append";
 }
 
-/** Titel-Vergleich ohne Groß-/Kleinschreibung, Umlaute und Satzzeichen. */
-export function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replaceAll("ä", "a")
-    .replaceAll("ö", "o")
-    .replaceAll("ü", "u")
-    .replaceAll("ß", "ss")
-    .replace(/[^a-z0-9]/g, "");
+/** Ergebnis des zentralen Imports: die angehakten Bereiche einer Datei. */
+export interface CentralImportSummary {
+  mode: "replace" | "append";
+  configImport?: ConfigImportSummary;
+  workshopImport?: WorkshopImportSummary;
+  participantImport?: ImportSummary;
+}
+
+/** Präfix für virtuelle Ids von Workshops, die erst durch dieselbe Importdatei angelegt werden. */
+export const NEW_WORKSHOP_PREFIX = "new:";
+
+export function virtualWorkshopId(name: string): string {
+  return NEW_WORKSHOP_PREFIX + name.trim().toLowerCase();
+}
+
+/**
+ * Löst die Zuordnung unbekannter Titel auf: „new:<name>“-Markierungen zeigen auf
+ * Workshops, die soeben aus derselben Datei importiert wurden, und werden gegen
+ * die dann tatsächlich angelegten Workshops aufgelöst.
+ */
+export function resolveTitleAssignments(
+  assignments: Record<string, string>,
+  workshops: { id: string; name: string }[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [title, id] of Object.entries(assignments)) {
+    if (!id) continue;
+    if (id.startsWith(NEW_WORKSHOP_PREFIX)) {
+      const name = id.slice(NEW_WORKSHOP_PREFIX.length);
+      const w = workshops.find((x) => x.name.trim().toLowerCase() === name);
+      if (w) out[title] = w.id;
+    } else {
+      out[title] = id;
+    }
+  }
+  return out;
 }
 
 function levenshtein(a: string, b: string): number {
@@ -102,6 +133,17 @@ export function collectUnmatchedTitles(
   return [...counts.entries()]
     .map(([title, count]) => ({ title, count }))
     .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title, "de"));
+}
+
+/**
+ * Erkennt ein Arbeitsblatt am Teilnehmer-Format (Namens- plus mindestens eine
+ * Wunsch-Spalte). Die Namensspalte darf nicht zugleich Wunsch-Spalte sein —
+ * sonst würde z. B. ein Anleitungsblatt („… Workshop-Wünsche eintragen“) als
+ * Teilnehmerblatt missverstanden.
+ */
+export function isParticipantTable(table: ParsedTable): boolean {
+  const m = guessMapping(table);
+  return m.nameColumn !== null && m.wishColumns.size > 0 && !m.wishColumns.has(m.nameColumn);
 }
 
 export function guessMapping(table: ParsedTable): ImportMapping {

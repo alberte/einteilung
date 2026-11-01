@@ -21,12 +21,12 @@
   }
 
   function downloadCsvTemplate() {
-    downloadFile("teilnehmer-import-vorlage.csv", participantCsvTemplate(app.project), "text/csv");
+    downloadFile("import-vorlage.csv", participantCsvTemplate(app.project), "text/csv");
   }
 
   function downloadXlsxTemplate() {
     downloadFile(
-      "teilnehmer-import-vorlage.xlsx",
+      "import-vorlage.xlsx",
       participantXlsxTemplate(app.project),
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
@@ -140,25 +140,25 @@
       </div>
       <div class="card-body">
         <p class="small text-secondary">
-          Leere Vorlagen zum Befüllen außerhalb der App — anschließend hier bzw. im Teilnehmer-Tab
-          laden:
+          Leere Vorlagen zum Befüllen außerhalb der App — anschließend über den Import-Button im
+          Kopf der Seite laden:
         </p>
         <div class="d-grid gap-2">
           <button class="btn btn-outline-primary" onclick={downloadXlsxTemplate}>
-            <i class="bi bi-filetype-xlsx me-1"></i>Teilnehmer-Import (Excel, mit Anleitung)
+            <i class="bi bi-filetype-xlsx me-1"></i>Import-Vorlage (Excel, mit Anleitung)
           </button>
           <button class="btn btn-outline-primary" onclick={downloadCsvTemplate}>
-            <i class="bi bi-filetype-csv me-1"></i>Teilnehmer-Import (CSV)
+            <i class="bi bi-filetype-csv me-1"></i>Import-Vorlage (CSV)
           </button>
           <button class="btn btn-outline-primary" onclick={downloadProjectTemplate}>
             <i class="bi bi-filetype-json me-1"></i>Leeres Projekt (JSON)
           </button>
         </div>
         <p class="small text-secondary mb-0 mt-3">
-          Die Excel-Vorlage enthält ein Anleitungsblatt, ein Ausfüllblatt für die Wünsche
-          (Beispielzeile mit den aktuell angelegten Workshop-Namen) und ein Referenzblatt mit allen
-          Workshops. Die CSV-Vorlage entspricht dem Ausfüllblatt (Semikolon-getrennt).
-          Workshop-Namen müssen exakt zu „Slots &amp; Workshops“ passen.
+          Die Excel-Vorlage enthält Blätter für Konfiguration, Workshops und Wünsche (jeweils mit
+          Beispielzeile bzw. aktuellen Werten) sowie ein Anleitungsblatt. Die CSV-Vorlage entspricht
+          dem Wunschblatt (Semikolon-getrennt). Workshop-Namen müssen exakt zu „Slots &amp;
+          Workshops“ passen.
         </p>
       </div>
     </div>

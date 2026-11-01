@@ -11,7 +11,7 @@ export default defineConfig({
           "global-builtin",
           "legacy-js-api",
           "color-functions",
-          "mixed-decls",
+          "if-function",
         ],
       },
     },

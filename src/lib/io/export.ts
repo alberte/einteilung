@@ -104,52 +104,6 @@ export function workshopListXlsx(project: Project): ArrayBuffer {
   return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
 }
 
-/**
- * XLSX-Vorlage für den Workshop-Import: Anleitungsblatt plus
- * Ausfüllblatt im Exportformat. Enthält das Projekt bereits Workshops,
- * wird die aktuelle Liste eingetragen (exportieren → bearbeiten →
- * wieder importieren); andernfalls Beispielzeilen.
- */
-export function workshopXlsxTemplate(project: Project): ArrayBuffer {
-  const exampleRows: (string | number)[][] =
-    project.workshops.length > 0
-      ? workshopListAoa(project).slice(1)
-      : [
-          ["Kochen", "Block 1 — 10:00", 2, 4, ""],
-          ["Theater", "Block 2 — 14:00", 0, 8, ""],
-        ];
-
-  const wb = XLSX.utils.book_new();
-  aoaToSheet(
-    wb,
-    [["Workshop", "Slot", "min", "max", "Hinweis"], ...exampleRows],
-    [26, 22, 6, 6, 50],
-    "Workshops",
-  );
-  aoaToSheet(
-    wb,
-    [
-      ["Anleitung — Workshop-Programm eintragen"],
-      [""],
-      ["1. Pro Zeile ein Workshop: Name, Slot, Mindest- (min) und Höchstbelegung (max)."],
-      ["2. „Slot“ = Name des Zeitblocks. Neue Slot-Namen werden beim Import automatisch angelegt."],
-      [
-        "3. Modus „ergänzen“: Workshops mit bereits vorhandenem Namen werden aktualisiert (Slot, min, max).",
-      ],
-      ["4. Modus „ersetzen“: die komplette bisherige Workshop- und Slot-Liste wird ersetzt."],
-      ["5. Die Spalte „Hinweis“ ist nur zur Information und wird beim Import ignoriert —"],
-      [
-        "   Verbindungen (gleicher Workshop in mehreren Slots, gekoppelte Paare) in der App pflegen.",
-      ],
-      ["6. Beispielzeilen ersetzen oder löschen."],
-      ["7. Import in der App: Tab „Slots & Workshops“ → „Excel-Import“."],
-    ],
-    [110],
-    "Anleitung",
-  );
-  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-}
-
 /** Ergebnis als mehrblättrige XLSX-Datei. */
 export function resultXlsx(
   project: Project,
@@ -277,9 +231,10 @@ export function participantCsvTemplate(project: Project): string {
 }
 
 /**
- * XLSX-Vorlage für den Teilnehmer-Import — für Nutzer ohne Tabellenkalkulations-
- * Erfahrung: erstes Blatt „Wünsche“ (landet automatisch im Import), dazu ein
- * Anleitungsblatt und ein Referenzblatt mit den angelegten Workshops.
+ * Zentrale XLSX-Vorlage für den Import — ein Blatt pro Import-Bereich:
+ * „Wünsche“ (Teilnehmer), „Workshops“ (Workshopliste) und „Konfiguration“
+ * (Einstellungen als Key-Value), dazu ein Anleitungsblatt. Beim Import in
+ * der App werden die gewünschten Blätter per Häkchen ausgewählt.
  */
 export function participantXlsxTemplate(project: Project): ArrayBuffer {
   const wishColumns = Math.max(5, project.config.n + 2);
@@ -305,17 +260,62 @@ export function participantXlsxTemplate(project: Project): ArrayBuffer {
   wsWishes["!cols"] = [{ wch: 24 }, ...Array.from({ length: wishColumns }, () => ({ wch: 24 }))];
   XLSX.utils.book_append_sheet(wb, wsWishes, "Wünsche");
 
-  // Blatt 2: Anleitung
+  // Blatt 2: Workshops (Workshopliste im Import-Format; gleichzeitig Referenz).
+  // Bei leerem Projekt Beispielzeilen, damit das Format sichtbar ist.
+  const workshopRows: (string | number)[][] =
+    project.workshops.length > 0
+      ? workshopListAoa(project).slice(1)
+      : [
+          ["Kochen", "Block 1 — 10:00", 2, 4, ""],
+          ["Theater", "Block 2 — 14:00", 0, 8, ""],
+        ];
+  aoaToSheet(
+    wb,
+    [["Workshop", "Slot", "min", "max", "Hinweis"], ...workshopRows],
+    [26, 22, 6, 6, 50],
+    "Workshops",
+  );
+
+  // Blatt 3: Konfiguration (Key-Value; wird beim Import auf die Projekt-Konfiguration gesetzt)
+  const wsConfig = XLSX.utils.aoa_to_sheet([
+    ["Einstellung", "Wert", "Hinweis"],
+    [
+      "Workshops pro Person (n)",
+      project.config.n,
+      "Anzahl Workshops, die jede Person maximal erhält",
+    ],
+    [
+      "Strafprofil",
+      project.config.penaltyProfile,
+      "linear = „Effizient“, fair = „Fair“ (quadratisch) — siehe Tab „Konfiguration“",
+    ],
+    [
+      "Solver-Zeitlimit (Sekunden)",
+      project.config.timeLimitSec,
+      "Nach dieser Zeit bricht die Berechnung ab",
+    ],
+  ]);
+  wsConfig["!cols"] = [{ wch: 30 }, { wch: 14 }, { wch: 62 }];
+  XLSX.utils.book_append_sheet(wb, wsConfig, "Konfiguration");
+
+  // Blatt 4: Anleitung
   const wsHelp = XLSX.utils.aoa_to_sheet([
-    ["Anleitung — Workshop-Wünsche eintragen"],
+    ["Anleitung — Import-Vorlage ausfüllen"],
     [""],
     ["1. Blatt „Wünsche“: eine Zeile pro Person, Name in Spalte A."],
     ["2. Wunsch 1 = Erstwunsch, Wunsch 2 = Zweitwunsch usw. (leere Spalten einfach frei lassen)"],
     [
       "3. Workshop-Namen bitte exakt wie auf dem Blatt „Workshops“ schreiben — am besten von dort kopieren (Groß-/Kleinschreibung ist egal).",
     ],
-    ["4. Die Beispielzeile („Beispielperson“) löschen oder überschreiben."],
-    ["5. Datei speichern und in der App unter „Teilnehmer & Wünsche“ importieren."],
+    ["4. Blatt „Workshops“: ein Workshop pro Zeile (Workshop, Slot, min, max)."],
+    ["5. Blatt „Konfiguration“: Einstellungen wie n, Strafprofil und Solver-Zeitlimit."],
+    [
+      "6. Weitere Blätter mit Teilnehmern (z. B. eine Klasse pro Blatt) werden automatisch mit importiert.",
+    ],
+    ["7. Die Beispielzeile („Beispielperson“) löschen oder überschreiben."],
+    [
+      "8. Datei speichern und in der App über den Import-Button im Kopf der Seite importieren — dort per Häkchen wählen, was übernommen wird.",
+    ],
     [""],
     ["Verbundene Workshops: ein Wunsch auf eine Durchführung gilt für alle."],
     ["Gekoppelte Workshops (z. B. Teil 1 + Teil 2): ein Wunsch auf einen Teil genügt."],
@@ -324,9 +324,6 @@ export function participantXlsxTemplate(project: Project): ArrayBuffer {
   ]);
   wsHelp["!cols"] = [{ wch: 110 }];
   XLSX.utils.book_append_sheet(wb, wsHelp, "Anleitung");
-
-  // Blatt 3: Workshops (Referenz)
-  aoaToSheet(wb, workshopListAoa(project), [26, 22, 6, 6, 50], "Workshops");
 
   return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
 }

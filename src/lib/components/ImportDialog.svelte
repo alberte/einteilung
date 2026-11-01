@@ -1,13 +1,18 @@
 <script lang="ts">
-  import { parseTable, type ParsedTable } from "../io/importFile";
+  import { mergeTables, parseSheets, type ParsedTable } from "../io/importFile";
   import {
     applyImport,
     collectUnmatchedTitles,
     guessMapping,
+    isParticipantTable,
+    resolveTitleAssignments,
     suggestWorkshopId,
-    type ImportSummary,
+    virtualWorkshopId,
+    type CentralImportSummary,
     type UnmatchedTitle,
   } from "../io/applyImport";
+  import { applyWorkshopImport, isWorkshopTable, parseWorkshopTable } from "../io/importWorkshops";
+  import { applyConfigImport, isConfigTable, parseConfigTable } from "../io/importConfig";
   import { downloadFile, participantCsvTemplate, participantXlsxTemplate } from "../io/export";
   import { app } from "../state.svelte";
 
@@ -16,11 +21,18 @@
     onDone,
   }: {
     open?: boolean;
-    onDone?: (summary: ImportSummary) => void;
+    onDone?: (summary: CentralImportSummary) => void;
   } = $props();
 
   let fileInput: HTMLInputElement | null = $state(null);
-  let table = $state<ParsedTable | null>(null);
+  /** gemergte Blätter pro Import-Bereich (null = nicht in der Datei) */
+  let configTable = $state<ParsedTable | null>(null);
+  let workshopTable = $state<ParsedTable | null>(null);
+  let participantTable = $state<ParsedTable | null>(null);
+  /** was importiert werden soll (vorbelegt: alles, was in der Datei gefunden wurde) */
+  let importConfig = $state(false);
+  let importWorkshops = $state(false);
+  let importWishes = $state(false);
   let mapping = $state<{ nameColumn: string | null; wishColumns: Map<string, number> }>({
     nameColumn: null,
     wishColumns: new Map(),
@@ -28,20 +40,64 @@
   let mode = $state<"replace" | "append">("replace");
   let error = $state<string | null>(null);
   let busy = $state(false);
-  let summary = $state<ImportSummary | null>(null);
-  let currentFile = $state<File | null>(null);
+  let summary = $state<CentralImportSummary | null>(null);
+  /** Blätter der Datei ohne bekanntes Format (z. B. „Anleitung“) — werden nicht importiert */
+  let skippedSheets = $state<string[]>([]);
 
   const MAX_WISHES = 12;
 
-  async function loadTable(file: File, sheet?: string) {
+  /** Workshop-Zeilen aus den Workshop-Blättern der Datei (noch nicht angelegt) */
+  const newWorkshopRows = $derived(workshopTable ? parseWorkshopTable(workshopTable) : []);
+  /** vorhandene Workshops plus virtuelle Einträge für die neuen aus der Datei */
+  const virtualWorkshops = $derived([
+    ...app.project.workshops,
+    ...newWorkshopRows.map((r) => ({ id: virtualWorkshopId(r.name), name: r.name })),
+  ]);
+
+  const mappingValid = $derived(
+    mapping.nameColumn !== null &&
+      mapping.wishColumns.size > 0 &&
+      new Set(mapping.wishColumns.values()).size === mapping.wishColumns.size,
+  );
+
+  const canApply = $derived(
+    (importConfig && configTable !== null) ||
+      (importWorkshops && workshopTable !== null) ||
+      (importWishes && participantTable !== null && mappingValid),
+  );
+
+  async function loadTable(file: File) {
     busy = true;
     error = null;
     try {
-      table = await parseTable(file, sheet);
-      mapping = guessMapping(table);
+      // alle Arbeitsblätter lesen und nach Import-Bereich sortieren
+      const sheets = await parseSheets(file);
+      const nonEmpty = sheets.filter((t) => t.rows.length > 0);
+      const cfgSheets = nonEmpty.filter(isConfigTable);
+      const wsSheets = nonEmpty.filter(isWorkshopTable);
+      const pSheets = nonEmpty.filter(isParticipantTable);
+      if (cfgSheets.length === 0 && wsSheets.length === 0 && pSheets.length === 0) {
+        throw new Error(
+          "Kein bekanntes Arbeitsblatt gefunden — erwartet werden Blätter mit „Einstellung“/„Wert“ " +
+            "(Konfiguration), „Workshop“/„Slot“ (Workshops) oder „Name“/„Wunsch …“ (Teilnehmer). " +
+            "Am einfachsten die Excel-Vorlage verwenden.",
+        );
+      }
+      configTable = cfgSheets.length > 0 ? mergeTables(cfgSheets) : null;
+      workshopTable = wsSheets.length > 0 ? mergeTables(wsSheets) : null;
+      participantTable = pSheets.length > 0 ? mergeTables(pSheets) : null;
+      skippedSheets = nonEmpty
+        .filter((t) => !cfgSheets.includes(t) && !wsSheets.includes(t) && !pSheets.includes(t))
+        .map((t) => t.sheetName ?? "?");
+      importConfig = configTable !== null;
+      importWorkshops = workshopTable !== null;
+      importWishes = participantTable !== null;
+      if (participantTable) mapping = guessMapping(participantTable);
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
-      table = null;
+      configTable = null;
+      workshopTable = null;
+      participantTable = null;
     } finally {
       busy = false;
     }
@@ -52,16 +108,15 @@
     const file = input.files?.[0];
     error = null;
     summary = null;
-    table = null;
-    currentFile = file ?? null;
+    configTable = null;
+    workshopTable = null;
+    participantTable = null;
+    skippedSheets = [];
+    importConfig = false;
+    importWorkshops = false;
+    importWishes = false;
     if (!file) return;
     await loadTable(file);
-  }
-
-  async function switchSheet(sheet: string) {
-    if (!currentFile || !table || table.sheetName === sheet) return;
-    summary = null;
-    await loadTable(currentFile, sheet);
   }
 
   function setRole(column: string, role: string) {
@@ -86,36 +141,49 @@
     return "ignore";
   }
 
-  const canApply = $derived(
-    table !== null &&
-      mapping.nameColumn !== null &&
-      mapping.wishColumns.size > 0 &&
-      new Set(mapping.wishColumns.values()).size === mapping.wishColumns.size,
-  );
-
   // --- Schritt 2: unbekannte Workshop-Titel zuordnen --------------------
   let assignStep = $state(false);
   let unmatchedTitles = $state<UnmatchedTitle[]>([]);
   let titleAssignments = $state<Record<string, string>>({});
 
   function startApply() {
-    if (!table || !canApply) return;
+    if (!canApply) return;
     summary = null;
-    const unmatched = collectUnmatchedTitles(table, mapping, app.project.workshops);
-    if (unmatched.length === 0) {
-      doApply();
-      return;
+    // auch Workshops aus derselben Datei beim Matching berücksichtigen (virtuelle Ids)
+    if (importWishes && participantTable && mappingValid) {
+      const unmatched = collectUnmatchedTitles(participantTable, mapping, virtualWorkshops);
+      if (unmatched.length > 0) {
+        unmatchedTitles = unmatched;
+        titleAssignments = Object.fromEntries(
+          unmatched.map((u) => [u.title, suggestWorkshopId(u.title, virtualWorkshops) ?? ""]),
+        );
+        assignStep = true;
+        return;
+      }
     }
-    unmatchedTitles = unmatched;
-    titleAssignments = Object.fromEntries(
-      unmatched.map((u) => [u.title, suggestWorkshopId(u.title, app.project.workshops) ?? ""]),
-    );
-    assignStep = true;
+    doApply();
   }
 
   function doApply() {
-    if (!table) return;
-    summary = applyImport(app.project, table, mapping, mode, titleAssignments);
+    const result: CentralImportSummary = { mode };
+    // Reihenfolge: Konfiguration -> Workshops -> Wünsche (Wunsch-Titel matchen gegen neue Workshops)
+    if (importConfig && configTable) {
+      result.configImport = applyConfigImport(app.project, parseConfigTable(configTable));
+    }
+    if (importWorkshops && workshopTable) {
+      result.workshopImport = applyWorkshopImport(app.project, workshopTable, mode);
+    }
+    if (importWishes && participantTable) {
+      const resolvedTitles = resolveTitleAssignments(titleAssignments, app.project.workshops);
+      result.participantImport = applyImport(
+        app.project,
+        participantTable,
+        mapping,
+        mode,
+        resolvedTitles,
+      );
+    }
+    summary = result;
     if (onDone && summary) onDone(summary);
   }
 
@@ -152,11 +220,23 @@
     startApply();
   }
 
+  const summaryHasWarnings = $derived(
+    (summary?.participantImport?.unmatchedWorkshops.length ?? 0) > 0 ||
+      (summary?.workshopImport?.skipped.length ?? 0) > 0 ||
+      (summary?.configImport?.skipped.length ?? 0) > 0,
+  );
+
   function close() {
     open = false;
-    table = null;
+    configTable = null;
+    workshopTable = null;
+    participantTable = null;
     summary = null;
     error = null;
+    skippedSheets = [];
+    importConfig = false;
+    importWorkshops = false;
+    importWishes = false;
     assignStep = false;
     unmatchedTitles = [];
     titleAssignments = {};
@@ -166,8 +246,73 @@
 
 {#snippet columnsHint()}
   Ordnen Sie jeder Spalte eine Rolle zu: genau eine Namens-Spalte und die Wunsch-Spalten in
-  Rangfolge (Wunsch 1 = Erstwunsch). Workshop-Namen müssen zu den im Tab „Slots &amp; Workshops“
-  angelegten Workshops passen (Groß-/Kleinschreibung ist egal).
+  Rangfolge (Wunsch 1 = Erstwunsch). Workshop-Namen müssen zu den angelegten Workshops passen
+  (Groß-/Kleinschreibung ist egal; Workshops aus derselben Datei werden automatisch erkannt).
+{/snippet}
+
+{#snippet sheetNames(names: string[] | undefined)}
+  {#if names && names.length > 1}
+    {names.map((s) => `„${s}“`).join(", ")}
+  {:else if names && names.length === 1}
+    „{names[0]}“
+  {/if}
+{/snippet}
+
+{#snippet summaryAlert()}
+  {#if summary}
+    <div class="alert {summaryHasWarnings ? 'alert-warning' : 'alert-success'}">
+      {#if summary.configImport}
+        <div>
+          <strong>Konfiguration:</strong>
+          {#if summary.configImport.applied.length > 0}
+            {summary.configImport.applied.map((a) => `${a.key} = ${a.value}`).join(", ")}
+          {:else}
+            keine gültigen Einstellungen gefunden
+          {/if}
+          {#if summary.configImport.skipped.length}
+            — übersprungen: {summary.configImport.skipped.join("; ")}
+          {/if}
+        </div>
+      {/if}
+      {#if summary.workshopImport}
+        <div>
+          <strong>Workshops:</strong>
+          <strong>{summary.workshopImport.workshopsCreated}</strong> angelegt,
+          <strong>{summary.workshopImport.workshopsUpdated}</strong> aktualisiert,
+          <strong>{summary.workshopImport.slotsCreated}</strong> Slots angelegt
+          {#if summary.workshopImport.skipped.length}
+            — übersprungen: {summary.workshopImport.skipped.join("; ")}
+          {/if}
+        </div>
+      {/if}
+      {#if summary.participantImport}
+        <div>
+          <strong>Teilnehmer:</strong>
+          <strong>{summary.participantImport.personsAdded}</strong> importiert,
+          <strong>{summary.participantImport.wishesAdded}</strong> Wünsche zugeordnet
+          {summary.participantImport.skippedRows
+            ? `, ${summary.participantImport.skippedRows} Zeile(n) ohne Namen übersprungen`
+            : ""}
+          ({summary.mode === "replace" ? "ersetzt" : "ergänzt"}).
+        </div>
+        {#if summary.participantImport.mappedTitles.length > 0}
+          <div class="mt-1">
+            Zugeordnete Titel:
+            {summary.participantImport.mappedTitles
+              .map((m) => `${m.title} → ${m.workshop}`)
+              .join(", ")}
+          </div>
+        {/if}
+        {#if summary.participantImport.unmatchedWorkshops.length}
+          <div class="mt-1">
+            Nicht zugeordnet (Wünsche verfallen): {summary.participantImport.unmatchedWorkshops.join(
+              ", ",
+            )}
+          </div>
+        {/if}
+      {/if}
+    </div>
+  {/if}
 {/snippet}
 
 {#if open}
@@ -175,9 +320,7 @@
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">
-            <i class="bi bi-file-import me-2"></i>Teilnehmer importieren (CSV / XLSX)
-          </h5>
+          <h5 class="modal-title"><i class="bi bi-file-import me-2"></i>Import (Excel / CSV)</h5>
           <button type="button" class="btn-close" aria-label="Schließen" onclick={close}></button>
         </div>
         <div class="modal-body">
@@ -217,6 +360,11 @@
                           {#each app.project.workshops as w (w.id)}
                             <option value={w.id}>{w.name} ({slotNameOf(w.slotId)})</option>
                           {/each}
+                          {#each newWorkshopRows as r (r.name)}
+                            <option value={virtualWorkshopId(r.name)}
+                              >{r.name} (neu aus dieser Datei)</option
+                            >
+                          {/each}
                         </select>
                       </td>
                       <td class="small">
@@ -229,36 +377,12 @@
                 </tbody>
               </table>
             </div>
-
-            {#if summary}
-              <div
-                class="alert {summary.unmatchedWorkshops.length
-                  ? 'alert-warning'
-                  : 'alert-success'}"
-              >
-                <div>
-                  <strong>{summary.personsAdded}</strong> Teilnehmer importiert,
-                  <strong>{summary.wishesAdded}</strong> Wünsche zugeordnet
-                  {summary.skippedRows
-                    ? `, ${summary.skippedRows} Zeile(n) ohne Namen übersprungen`
-                    : ""}.
-                </div>
-                {#if summary.mappedTitles.length > 0}
-                  <div class="mt-1">
-                    Zugeordnete Titel:
-                    {summary.mappedTitles.map((m) => `${m.title} → ${m.workshop}`).join(", ")}
-                  </div>
-                {/if}
-                {#if summary.unmatchedWorkshops.length}
-                  <div class="mt-1">
-                    Nicht zugeordnet (Wünsche verfallen):
-                    {summary.unmatchedWorkshops.join(", ")}
-                  </div>
-                {/if}
-              </div>
-            {/if}
+            {@render summaryAlert()}
           {:else}
-            <p class="text-secondary">{@render columnsHint()}</p>
+            <p class="text-secondary">
+              Alle Arbeitsblätter der Datei werden erkannt — wählen Sie per Häkchen, was importiert
+              werden soll. Reihenfolge beim Import: Konfiguration, dann Workshops, dann Wünsche.
+            </p>
 
             <div class="mb-3">
               <label class="form-label" for="import-file">Datei (.xlsx, .xls, .csv)</label>
@@ -277,47 +401,29 @@
                   class="btn btn-link btn-sm p-0 align-baseline"
                   onclick={() =>
                     downloadFile(
-                      "teilnehmer-import-vorlage.xlsx",
+                      "import-vorlage.xlsx",
                       participantXlsxTemplate(app.project),
                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     )}
                 >
                   Excel-Vorlage
                 </button>
-                (mit Anleitung und Workshop-Liste) oder
+                (mit Konfigurations-, Workshop- und Wunschblatt sowie Anleitung) oder
                 <button
                   type="button"
                   class="btn btn-link btn-sm p-0 align-baseline"
                   onclick={() =>
                     downloadFile(
-                      "teilnehmer-import-vorlage.csv",
+                      "import-vorlage.csv",
                       participantCsvTemplate(app.project),
                       "text/csv",
                     )}
                 >
                   CSV-Vorlage
                 </button>
+                (nur Wünsche).
               </div>
             </div>
-
-            {#if table?.sheetNames && table.sheetNames.length > 1}
-              <div class="mb-3">
-                <label class="form-label" for="import-sheet">Arbeitsblatt</label>
-                <select
-                  id="import-sheet"
-                  class="form-select"
-                  value={table.sheetName}
-                  onchange={(e) => switchSheet((e.target as HTMLSelectElement).value)}
-                >
-                  {#each table.sheetNames as sheet (sheet)}
-                    <option value={sheet}>{sheet}</option>
-                  {/each}
-                </select>
-                <div class="form-text">
-                  Mehrere Arbeitsblätter erkannt — hier auswählen, welches die Teilnehmer enthält.
-                </div>
-              </div>
-            {/if}
 
             {#if busy}
               <div class="alert alert-secondary d-flex align-items-center gap-2">
@@ -332,116 +438,155 @@
               </div>
             {/if}
 
-            {#if table}
-              <div class="mb-2 d-flex flex-wrap align-items-center">
-                <strong>{table.rows.length}</strong>&nbsp;Zeilen erkannt ({table.source === "csv"
-                  ? "CSV"
-                  : `Tabelle „${table.sheetName}“`}) —&nbsp;
-                <div class="form-check form-check-inline mb-0">
+            {#if configTable || workshopTable || participantTable}
+              <div class="mb-3">
+                <span class="form-label d-block">Was importieren?</span>
+                <div class="form-check">
                   <input
                     class="form-check-input"
-                    type="radio"
-                    id="mode-replace"
-                    value="replace"
-                    bind:group={mode}
+                    type="checkbox"
+                    id="imp-config"
+                    bind:checked={importConfig}
+                    disabled={configTable === null}
                   />
-                  <label class="form-check-label" for="mode-replace"
-                    >vorhandene Teilnehmer ersetzen</label
-                  >
+                  <label class="form-check-label" for="imp-config">
+                    Konfiguration {#if configTable}<span class="text-secondary"
+                        >(Blatt {@render sheetNames(configTable.usedSheetNames)})</span
+                      >{:else}<span class="text-secondary">(nicht in der Datei)</span>{/if}
+                  </label>
                 </div>
-                <div class="form-check form-check-inline mb-0">
+                <div class="form-check">
                   <input
                     class="form-check-input"
-                    type="radio"
-                    id="mode-append"
-                    value="append"
-                    bind:group={mode}
+                    type="checkbox"
+                    id="imp-workshops"
+                    bind:checked={importWorkshops}
+                    disabled={workshopTable === null}
                   />
-                  <label class="form-check-label" for="mode-append">anhängen</label>
+                  <label class="form-check-label" for="imp-workshops">
+                    Workshops &amp; Slots {#if workshopTable}<span class="text-secondary"
+                        >(Blatt {@render sheetNames(workshopTable.usedSheetNames)})</span
+                      >{:else}<span class="text-secondary">(nicht in der Datei)</span>{/if}
+                  </label>
                 </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="imp-wishes"
+                    bind:checked={importWishes}
+                    disabled={participantTable === null}
+                  />
+                  <label class="form-check-label" for="imp-wishes">
+                    Teilnehmer &amp; Wünsche {#if participantTable}<span class="text-secondary"
+                        >(Blatt {@render sheetNames(participantTable.usedSheetNames)})</span
+                      >{:else}<span class="text-secondary">(nicht in der Datei)</span>{/if}
+                  </label>
+                </div>
+                {#if skippedSheets.length > 0}
+                  <div class="text-secondary small mt-1">
+                    Übersprungen (kein bekanntes Format): {skippedSheets
+                      .map((s) => `„${s}“`)
+                      .join(", ")}
+                  </div>
+                {/if}
               </div>
 
-              <div class="table-responsive border rounded mb-3" style="max-height: 18rem;">
-                <table class="table table-sm table-striped mb-0">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      {#each table.columns as col (col)}
-                        <th class="col-3">
-                          {col}
-                          <select
-                            class="form-select form-select-sm mt-1"
-                            value={roleOf(col)}
-                            onchange={(e) => setRole(col, (e.target as HTMLSelectElement).value)}
-                            aria-label="Rolle der Spalte {col}"
-                          >
-                            <option value="ignore">— ignorieren —</option>
-                            <option value="name">Name</option>
-                            {#each Array.from({ length: MAX_WISHES }, (_, i) => i + 1) as rank (rank)}
-                              <option value={rank}>Wunsch {rank}</option>
-                            {/each}
-                          </select>
-                        </th>
-                      {/each}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each table.rows.slice(0, 6) as row, i (i)}
-                      <tr>
-                        <td class="text-secondary">{i + 1}</td>
-                        {#each table.columns as col (col)}
-                          <td class="text-truncate" style="max-width: 14rem;" title={row[col]}
-                            >{row[col]}</td
-                          >
-                        {/each}
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
-
-              {#if !canApply}
-                <div class="alert alert-warning">
-                  Bitte genau eine <strong>Name</strong>-Spalte und mindestens eine
-                  <strong>Wunsch</strong>-Spalte wählen — Wunsch-Ränge dürfen nur je einmal vergeben
-                  werden.
-                  <button
-                    class="btn btn-sm btn-outline-secondary ms-2"
-                    onclick={() => table && (mapping = guessMapping(table))}
-                  >
-                    Zuordnung zurücksetzen
-                  </button>
+              {#if (importWorkshops && workshopTable) || (importWishes && participantTable)}
+                <div class="mb-3 d-flex flex-wrap align-items-center gap-3">
+                  <div class="form-check form-check-inline mb-0">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      id="mode-replace"
+                      value="replace"
+                      bind:group={mode}
+                    />
+                    <label class="form-check-label" for="mode-replace"
+                      >alles ersetzen (Workshops und Teilnehmer)</label
+                    >
+                  </div>
+                  <div class="form-check form-check-inline mb-0">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      id="mode-append"
+                      value="append"
+                      bind:group={mode}
+                    />
+                    <label class="form-check-label" for="mode-append"
+                      >ergänzen (Workshops aktualisieren, Teilnehmer anhängen)</label
+                    >
+                  </div>
                 </div>
               {/if}
-            {/if}
 
-            {#if summary}
-              <div
-                class="alert {summary.unmatchedWorkshops.length
-                  ? 'alert-warning'
-                  : 'alert-success'}"
-              >
-                <div>
-                  <strong>{summary.personsAdded}</strong> Teilnehmer importiert,
-                  <strong>{summary.wishesAdded}</strong> Wünsche zugeordnet
-                  {summary.skippedRows
-                    ? `, ${summary.skippedRows} Zeile(n) ohne Namen übersprungen`
-                    : ""}.
+              {#if importWishes && participantTable}
+                <p class="text-secondary small">{@render columnsHint()}</p>
+                <div class="mb-2">
+                  <strong>{participantTable.rows.length}</strong> Zeilen erkannt ({participantTable.source ===
+                  "csv"
+                    ? "CSV"
+                    : (participantTable.usedSheetNames?.length ?? 0) > 1
+                      ? `aus ${participantTable.usedSheetNames?.length} Arbeitsblättern`
+                      : `Tabelle „${participantTable.sheetName}“`})
                 </div>
-                {#if summary.unmatchedWorkshops.length}
-                  <div class="mt-1">
-                    Unbekannte Workshop-Namen (Wunsch wurde verworfen — bitte Workshops anlegen oder
-                    Datei korrigieren):
-                    {summary.unmatchedWorkshops.join(", ")}
+
+                <div class="table-responsive border rounded mb-3" style="max-height: 18rem;">
+                  <table class="table table-sm table-striped mb-0">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        {#each participantTable.columns as col (col)}
+                          <th class="col-3">
+                            {col}
+                            <select
+                              class="form-select form-select-sm mt-1"
+                              value={roleOf(col)}
+                              onchange={(e) => setRole(col, (e.target as HTMLSelectElement).value)}
+                              aria-label="Rolle der Spalte {col}"
+                            >
+                              <option value="ignore">— ignorieren —</option>
+                              <option value="name">Name</option>
+                              {#each Array.from({ length: MAX_WISHES }, (_, i) => i + 1) as rank (rank)}
+                                <option value={rank}>Wunsch {rank}</option>
+                              {/each}
+                            </select>
+                          </th>
+                        {/each}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each participantTable.rows.slice(0, 6) as row, i (i)}
+                        <tr>
+                          <td class="text-secondary">{i + 1}</td>
+                          {#each participantTable.columns as col (col)}
+                            <td class="text-truncate" style="max-width: 14rem;" title={row[col]}
+                              >{row[col]}</td
+                            >
+                          {/each}
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </div>
+
+                {#if !mappingValid}
+                  <div class="alert alert-warning">
+                    Bitte genau eine <strong>Name</strong>-Spalte und mindestens eine
+                    <strong>Wunsch</strong>-Spalte wählen — Wunsch-Ränge dürfen nur je einmal
+                    vergeben werden.
+                    <button
+                      class="btn btn-sm btn-outline-secondary ms-2"
+                      onclick={() => participantTable && (mapping = guessMapping(participantTable))}
+                    >
+                      Zuordnung zurücksetzen
+                    </button>
                   </div>
                 {/if}
-                {#if summary.mappedTitles.length > 0}
-                  <div class="mt-1">
-                    Zugeordnete Titel:
-                    {summary.mappedTitles.map((m) => `${m.title} → ${m.workshop}`).join(", ")}
-                  </div>
-                {/if}
-              </div>
+              {/if}
+
+              {@render summaryAlert()}
             {/if}
           {/if}
         </div>
